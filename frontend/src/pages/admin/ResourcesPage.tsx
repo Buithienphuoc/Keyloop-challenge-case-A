@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { get, patch, post } from '../../api/client';
-import { useReferenceData } from '../../api/hooks';
+import { get, patch, post, put } from '../../api/client';
+import { keys, useDealerships, useReferenceData } from '../../api/hooks';
+import { useAuth } from '../../auth/AuthContext';
 import type { Role } from '../../api/types';
 import { ErrorNote, Loading, PageHead } from '../../components/ui';
 import { ROLE_LABEL, WEEKDAYS, weekdays } from '../../lib/format';
@@ -32,7 +33,7 @@ interface Staff {
   isActive: boolean;
 }
 
-type Tab = 'bays' | 'technicians' | 'staff';
+type Tab = 'bays' | 'technicians' | 'staff' | 'hours';
 
 /** What the scheduler allocates (bays, technicians with skills and shifts) and who can sign in. */
 export function ResourcesPage() {
@@ -49,6 +50,7 @@ export function ResourcesPage() {
             ['bays', 'Service bays'],
             ['technicians', 'Technicians'],
             ['staff', 'Staff accounts'],
+            ['hours', 'Opening hours'],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
@@ -59,6 +61,7 @@ export function ResourcesPage() {
       {tab === 'bays' && <Bays />}
       {tab === 'technicians' && <Technicians />}
       {tab === 'staff' && <StaffAccounts />}
+      {tab === 'hours' && <OpeningHours />}
     </div>
   );
 }
@@ -270,7 +273,7 @@ function Technicians() {
 function StaffAccounts() {
   const qc = useQueryClient();
   const staff = useQuery({ queryKey: ['admin', 'staff'], queryFn: () => get<Staff[]>('/api/admin/staff') });
-  const empty = { fullName: '', email: '', password: '', role: 'SERVICE_ADVISOR' as 'SERVICE_ADVISOR' | 'ADMIN' };
+  const empty = { fullName: '', email: '', password: '', role: 'SERVICE_ADVISOR' as 'SERVICE_ADVISOR' | 'ADMIN' | 'WORKSHOP_CONTROLLER' | 'PARTS_STAFF' };
   const [form, setForm] = useState(empty);
   const add = useMutation({
     mutationFn: () => post('/api/admin/staff', form),
@@ -330,6 +333,8 @@ function StaffAccounts() {
           <label htmlFor="s-role">Role</label>
           <select id="s-role" className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as typeof form.role })}>
             <option value="SERVICE_ADVISOR">Service advisor</option>
+            <option value="WORKSHOP_CONTROLLER">Workshop controller</option>
+            <option value="PARTS_STAFF">Parts staff</option>
             <option value="ADMIN">Dealership admin</option>
           </select>
         </div>
@@ -338,5 +343,109 @@ function StaffAccounts() {
         </button>
       </form>
     </div>
+  );
+}
+
+interface HoursSaved {
+  upcomingOutsideHours: number;
+}
+
+/** Opening hours and booking rules. Availability follows them at once; existing bookings stay. */
+function OpeningHours() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const dealerships = useDealerships();
+  const d = dealerships.data?.find((x) => x.id === user?.dealershipId);
+  const [form, setForm] = useState<null | {
+    openingTime: string;
+    closingTime: string;
+    openDays: number[];
+    slotMinutes: number;
+    minLeadMinutes: number;
+    maxDaysAhead: number;
+  }>(null);
+  const save = useMutation({
+    mutationFn: (body: NonNullable<typeof form>) => put<HoursSaved>('/api/admin/opening-hours', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.dealerships }),
+  });
+  if (!d) return <Loading />;
+  const f = form ?? {
+    openingTime: d.openingTime,
+    closingTime: d.closingTime,
+    openDays: d.openDays,
+    slotMinutes: d.slotMinutes,
+    minLeadMinutes: d.minLeadMinutes,
+    maxDaysAhead: d.maxDaysAhead,
+  };
+  const set = (patchValue: Partial<typeof f>) => setForm({ ...f, ...patchValue });
+  const flip = (day: number) => set({ openDays: f.openDays.includes(day) ? f.openDays.filter((x) => x !== day) : [...f.openDays, day].sort() });
+
+  return (
+    <form
+      className="panel stack"
+      style={{ maxWidth: 560 }}
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        save.mutate(f);
+      }}
+    >
+      <h3>Opening hours and booking rules</h3>
+      <p className="muted small">Customers only see times inside these hours. Bookings already made are kept; you will see how many fall outside.</p>
+      <ErrorNote error={save.error} />
+      {save.isSuccess && (
+        <div className={`notice ${save.data.upcomingOutsideHours > 0 ? 'notice-info' : 'notice-ok'}`}>
+          Saved.{' '}
+          {save.data.upcomingOutsideHours > 0
+            ? `${save.data.upcomingOutsideHours} upcoming booking(s) now fall outside the new hours: please call those customers.`
+            : 'No upcoming booking is affected.'}
+        </div>
+      )}
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="h-open">Opens</label>
+          <input id="h-open" className="input" type="time" value={f.openingTime} onChange={(e) => set({ openingTime: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="h-close">Closes</label>
+          <input id="h-close" className="input" type="time" value={f.closingTime} onChange={(e) => set({ closingTime: e.target.value })} />
+        </div>
+      </div>
+      <fieldset className="field fieldset">
+        <legend className="label" style={{ marginBottom: 6 }}>
+          Open on
+        </legend>
+        <div className="checks">
+          {WEEKDAYS.map((day, i) => (
+            <label className="check" key={day}>
+              <input type="checkbox" checked={f.openDays.includes(i + 1)} onChange={() => flip(i + 1)} />
+              <span>{day}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="h-slot">Start times every</label>
+          <select id="h-slot" className="input" value={f.slotMinutes} onChange={(e) => set({ slotMinutes: Number(e.target.value) })}>
+            {[15, 30, 60].map((m) => (
+              <option key={m} value={m}>
+                {m} minutes
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="h-lead">Earliest booking (minutes from now)</label>
+          <input id="h-lead" className="input" type="number" min={0} value={f.minLeadMinutes} onChange={(e) => set({ minLeadMinutes: Number(e.target.value) })} />
+        </div>
+      </div>
+      <div className="field">
+        <label htmlFor="h-ahead">Bookable up to (days ahead)</label>
+        <input id="h-ahead" className="input" type="number" min={1} max={365} value={f.maxDaysAhead} onChange={(e) => set({ maxDaysAhead: Number(e.target.value) })} />
+      </div>
+      <button className="btn btn-primary" disabled={save.isPending || f.openDays.length === 0}>
+        Save hours
+      </button>
+    </form>
   );
 }

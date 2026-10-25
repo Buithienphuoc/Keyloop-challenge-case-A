@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { get, post } from '../../api/client';
 import type { Appointment, AppointmentStatus } from '../../api/types';
 import { DayNav } from '../../components/DayNav';
@@ -66,6 +67,11 @@ function JobCard({ j, date }: { j: Appointment; date: string }) {
           </ul>
         )}
         <ErrorNote error={move.error} />
+        {(j.status === 'CONFIRMED' || j.status === 'IN_PROGRESS') && (
+          <Link className="btn btn-sm btn-ghost" to={`/parts?appointment=${j.id}`}>
+            Request parts for this job
+          </Link>
+        )}
         {j.status === 'CONFIRMED' && (
           <button className="btn btn-primary btn-block" disabled={move.isPending} onClick={() => move.mutate('IN_PROGRESS')}>
             Start job

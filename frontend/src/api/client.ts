@@ -81,3 +81,4 @@ export const get = <T,>(path: string) => api<T>(path);
 export const post = <T,>(path: string, body?: unknown, headers?: Record<string, string>) =>
   api<T>(path, { method: 'POST', body: body ?? {}, headers });
 export const patch = <T,>(path: string, body: unknown) => api<T>(path, { method: 'PATCH', body });
+export const put = <T,>(path: string, body: unknown) => api<T>(path, { method: 'PUT', body });

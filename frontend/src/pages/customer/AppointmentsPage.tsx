@@ -6,13 +6,13 @@ import { keys, useMyAppointments } from '../../api/hooks';
 import type { Appointment } from '../../api/types';
 import { Empty, ErrorNote, Loading, PageHead, Plate, StatusPill } from '../../components/ui';
 import { downloadIcs } from '../../lib/calendar';
-import { dt, money, time, vehicleName } from '../../lib/format';
+import { dt, money, time, timeIn, vehicleName } from '../../lib/format';
 
 export function AppointmentsPage() {
   const appointments = useMyAppointments();
   const now = Date.now();
   const all = appointments.data ?? [];
-  const upcoming = all.filter((a) => ['CONFIRMED', 'IN_PROGRESS'].includes(a.status) && Date.parse(a.end) > now);
+  const upcoming = all.filter((a) => ['HELD', 'CONFIRMED', 'IN_PROGRESS'].includes(a.status) && Date.parse(a.end) > now);
   const past = all.filter((a) => !upcoming.includes(a)).reverse();
 
   return (
@@ -67,7 +67,7 @@ function AppointmentItem({ a, past = false }: { a: Appointment; past?: boolean }
       qc.invalidateQueries({ queryKey: ['availability'] });
     },
   });
-  const canCancel = a.status === 'CONFIRMED' && Date.parse(a.start) > Date.now();
+  const canCancel = (a.status === 'CONFIRMED' || a.status === 'HELD') && Date.parse(a.start) > Date.now();
 
   return (
     <div className={`item${past ? ' past' : ''}`}>
@@ -83,6 +83,9 @@ function AppointmentItem({ a, past = false }: { a: Appointment; past?: boolean }
         <div className="meta">
           {vehicleName(a.vehicle)} · {a.technician.name} · {money(a.price)} · Ref <span className="sign">{a.reference}</span>
         </div>
+        {a.status === 'HELD' && a.holdExpiresAt && (
+          <div className="meta">Reserved until {timeIn(a.holdExpiresAt, a.dealership.timezone)} while you finish booking; it is released after that.</div>
+        )}
         {cancel.error ? <ErrorNote error={cancel.error} /> : null}
       </div>
       {!past && (

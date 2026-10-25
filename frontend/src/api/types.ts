@@ -1,8 +1,8 @@
 // Mirrors the backend's API (see backend/openapi.yaml).
 
-export type Role = 'CUSTOMER' | 'SERVICE_ADVISOR' | 'TECHNICIAN' | 'ADMIN' | 'SYSTEM_MANAGER';
+export type Role = 'CUSTOMER' | 'SERVICE_ADVISOR' | 'TECHNICIAN' | 'ADMIN' | 'SYSTEM_MANAGER' | 'WORKSHOP_CONTROLLER' | 'PARTS_STAFF';
 export type VehicleType = 'MOTORBIKE' | 'CAR';
-export type AppointmentStatus = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+export type AppointmentStatus = 'HELD' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED';
 export type ConsultationKind = 'INSPECTION' | 'MODIFICATION';
 export type ConsultationStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'BOOKED' | 'CANCELLED';
 
@@ -32,6 +32,9 @@ export interface Dealership {
   openingTime: string;
   closingTime: string;
   openDays: number[];
+  slotMinutes: number;
+  minLeadMinutes: number;
+  maxDaysAhead: number;
 }
 
 export interface Money {
@@ -104,6 +107,8 @@ export interface Appointment {
   customerNote: string | null;
   cancelReason: string | null;
   createdAt: string;
+  /** Only while HELD: when the hold runs out unless the customer confirms. */
+  holdExpiresAt: string | null;
 }
 
 export interface Consultation {
@@ -131,4 +136,62 @@ export interface ReferenceData {
   inspectionAreas: { code: string; name: string }[];
   skills: { code: string; name: string }[];
   bayTypes: { code: string; name: string; vehicleTypes: VehicleType[] }[];
+}
+
+export interface ResourceLoad {
+  id: string;
+  name: string;
+  availableMinutes: number;
+  bookedMinutes: number;
+  jobs: number;
+  utilisation: number;
+}
+
+export interface Workload {
+  date: string;
+  timezone: string;
+  technicians: (ResourceLoad & { skills: string[] })[];
+  bays: (ResourceLoad & { bayType: string })[];
+}
+
+export type PartOrderStatus = 'REQUESTED' | 'ORDERED' | 'RECEIVED' | 'ISSUED' | 'CANCELLED';
+
+export interface Part {
+  id: string;
+  sku: string;
+  name: string;
+  unitPrice: number;
+  currency: string;
+  stockQty: number;
+  isActive: boolean;
+}
+
+export interface PartOrder {
+  id: string;
+  reference: string;
+  status: PartOrderStatus;
+  appointment: { id: string; reference: string; start: string; vehiclePlate: string } | null;
+  note: string | null;
+  requestedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  lines: { partId: string; sku: string; name: string; quantity: number; unitPrice: number; inStock: number }[];
+  total: number;
+  currency: string;
+}
+
+export interface PackageRecord {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  vehicleType: VehicleType;
+  durationMinutes: number;
+  requiredSkill: string;
+  bayType: string;
+  priceAmount: number;
+  currency: string;
+  checklist: string[];
+  isRecommended: boolean;
+  isActive: boolean;
 }

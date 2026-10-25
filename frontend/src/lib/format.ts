@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import type { AppointmentStatus, ConsultationStatus, Role } from '../api/types';
+import type { AppointmentStatus, ConsultationStatus, PartOrderStatus, Role } from '../api/types';
 
 const vnd = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
@@ -15,6 +15,8 @@ export const dayLong = (iso: string) => dt(iso).toFormat('cccc d LLLL');
 export const dayShort = (iso: string) => dt(iso).toFormat('ccc d LLL');
 /** Record timestamps (createdAt, …) arrive in UTC; show them in the dealership's zone too. */
 export const stamp = (iso: string, zone = 'Asia/Ho_Chi_Minh') => DateTime.fromISO(iso).setZone(zone).toFormat('d LLL, HH:mm');
+/** A UTC timestamp as a wall-clock time in the given zone. */
+export const timeIn = (iso: string, zone = 'Asia/Ho_Chi_Minh') => DateTime.fromISO(iso).setZone(zone).toFormat('HH:mm');
 export const whenLong = (iso: string) => `${dayLong(iso)}, ${time(iso)}`;
 
 export function duration(minutes: number): string {
@@ -36,11 +38,13 @@ export function relativeDay(isoDate: string, zone: string): string {
 export const todayIn = (zone = 'Asia/Ho_Chi_Minh') => DateTime.now().setZone(zone).toISODate()!;
 
 export const STATUS_LABEL: Record<AppointmentStatus, string> = {
+  HELD: 'On hold',
   CONFIRMED: 'Confirmed',
   IN_PROGRESS: 'In the workshop',
   COMPLETED: 'Done',
   CANCELLED: 'Cancelled',
   NO_SHOW: 'Missed',
+  EXPIRED: 'Hold ran out',
 };
 
 export const REQUEST_LABEL: Record<ConsultationStatus, string> = {
@@ -57,7 +61,19 @@ export const ROLE_LABEL: Record<Role, string> = {
   TECHNICIAN: 'Technician',
   ADMIN: 'Dealership admin',
   SYSTEM_MANAGER: 'System manager',
+  WORKSHOP_CONTROLLER: 'Workshop controller',
+  PARTS_STAFF: 'Parts staff',
 };
+
+export const PART_ORDER_LABEL: Record<PartOrderStatus, string> = {
+  REQUESTED: 'Requested',
+  ORDERED: 'Ordered from supplier',
+  RECEIVED: 'Received',
+  ISSUED: 'Issued',
+  CANCELLED: 'Cancelled',
+};
+
+export const vnd0 = (amount: number) => vnd.format(amount);
 
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const weekdays = (days: number[]) =>
