@@ -43,8 +43,10 @@ lazy val root = (project in file("."))
       "org.scalatestplus"        %% "scalacheck-1-18"           % "3.2.19.0" % Test,
       "org.scalacheck"           %% "scalacheck"                % "1.18.1"   % Test
     ),
-    // Same PostgreSQL major version on every developer OS.
-    libraryDependencies ++= Seq("darwin-amd64", "darwin-arm64v8", "linux-amd64", "linux-arm64v8", "windows-amd64").map { platform =>
+    // Same PostgreSQL major version on every developer OS. Container images always get a real
+    // DATABASE_URL, so SCHEDULER_SLIM=true (set by the Dockerfile) leaves these binaries out.
+    libraryDependencies ++= (if (sys.env.get("SCHEDULER_SLIM").contains("true")) Nil
+    else Seq("darwin-amd64", "darwin-arm64v8", "linux-amd64", "linux-arm64v8", "windows-amd64")).map { platform =>
       "io.zonky.test.postgres" % s"embedded-postgres-binaries-$platform" % embeddedPgBinaries % Runtime
     },
     // Flyway and logstash-logback-encoder bring a newer Jackson than Play/Pekko; align every
@@ -60,6 +62,9 @@ lazy val root = (project in file("."))
       "com.fasterxml.jackson.module"    %% "jackson-module-scala"           % jackson
     ),
     excludeDependencies += "io.zonky.test.postgres" % "embedded-postgres-binaries-linux-amd64-alpine",
+    // `sbt stage` (used by the Docker image) does not need Scaladoc.
+    Compile / doc / sources := Seq.empty,
+    Compile / packageDoc / publishArtifact := false,
     // Integration tests share one embedded PostgreSQL; each suite gets its own database.
     Test / fork := true,
     Test / parallelExecution := false,

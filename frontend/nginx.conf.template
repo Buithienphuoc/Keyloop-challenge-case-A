@@ -1,0 +1,29 @@
+# Rendered by the nginx image at start-up: ${API_UPSTREAM} and ${PORT} come from the environment.
+server {
+  listen ${PORT};
+  root /usr/share/nginx/html;
+
+  # API, health probe and API docs go to the backend. With several API replicas behind
+  # API_UPSTREAM, nginx (or the platform's load balancer) spreads requests across them; the
+  # X-Served-By response header shows which replica answered.
+  location ~ ^/(api|docs|health)(/|$) {
+    proxy_pass http://${API_UPSTREAM};
+    # The platform routes internal traffic by host name, so send the upstream's own name.
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+    proxy_read_timeout 30s;
+  }
+
+  # Hashed build assets never change, so browsers may keep them.
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+  }
+
+  # Client-side routes (/book, /staff/board, ...) all load the single-page app.
+  location / {
+    try_files $uri /index.html;
+  }
+}
