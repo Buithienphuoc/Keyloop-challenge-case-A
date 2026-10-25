@@ -288,3 +288,14 @@ class FeaturesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       (post(s"/api/parts/${added.str("id")}/stock", partsD1, Json.obj("delta" -> 5)).json \ "stockQty").as[Int] shouldBe 7
     }
   }
+
+  describe("tracing and scale-out signals") {
+    it("continues the caller's trace (W3C traceparent) and says which instance answered") {
+      val traceId = "4bf92f3577b34da6a3ce929d0e0e4736"
+      val res = h.api("GET", "/api/me/appointments", customer, headers = Seq("traceparent" -> s"00-$traceId-00f067aa0ba902b7-01"))
+      res.status shouldBe 200
+      res.header("X-Trace-Id") shouldBe Some(traceId)
+      res.header("X-Served-By").getOrElse("") should not be empty
+      get("/health").header("X-Trace-Id").map(_.length) shouldBe Some(32) // a new trace when the caller sent none
+    }
+  }

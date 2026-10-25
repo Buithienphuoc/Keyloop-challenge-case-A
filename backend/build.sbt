@@ -5,6 +5,7 @@ ThisBuild / organization := "com.example.scheduler"
 val embeddedPgBinaries = "17.6.0"
 val prometheus = "1.10.0"
 val jackson = "2.19.1"
+val otel = "1.55.0"
 
 lazy val root = (project in file("."))
   .enablePlugins(PlayScala)
@@ -32,6 +33,12 @@ lazy val root = (project in file("."))
       "io.prometheus"             % "prometheus-metrics-exposition-formats" % prometheus,
       "io.prometheus"             % "prometheus-metrics-instrumentation-jvm" % prometheus,
       "org.webjars"               % "swagger-ui"                % "5.17.14",
+      // Distributed tracing: spans for every request, booking attempt and SQL statement,
+      // exported over OTLP when OTEL_EXPORTER_OTLP_ENDPOINT is set (e.g. to Jaeger).
+      "io.opentelemetry"          % "opentelemetry-api"         % otel,
+      "io.opentelemetry"          % "opentelemetry-sdk"         % otel,
+      "io.opentelemetry"          % "opentelemetry-exporter-otlp" % otel,
+      "io.opentelemetry"          % "opentelemetry-sdk-extension-autoconfigure" % otel,
       "org.scalatestplus.play"   %% "scalatestplus-play"        % "7.0.2"    % Test,
       "org.scalatestplus"        %% "scalacheck-1-18"           % "3.2.19.0" % Test,
       "org.scalacheck"           %% "scalacheck"                % "1.18.1"   % Test

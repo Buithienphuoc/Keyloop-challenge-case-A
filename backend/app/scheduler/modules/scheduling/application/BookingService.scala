@@ -11,7 +11,7 @@ import scheduler.modules.identity.{AuthContext, Role}
 import scheduler.modules.scheduling.domain.{AppointmentStatus, Availability}
 import scheduler.modules.scheduling.domain.Availability.StartValidationError
 import scheduler.modules.vehicles.OwnedVehicles
-import scheduler.shared.{AppError, Db, Ids, JsonFormats, Log, Metrics, TransientStorageError}
+import scheduler.shared.{AppError, Db, Ids, JsonFormats, Log, Metrics, Tracing, TransientStorageError}
 import SchedulingJson.given
 import Workshop.{isOfferedHere, rulesOf}
 
@@ -144,7 +144,7 @@ final class BookingService(
           else
             val outcome: Either[String, Option[BookingResult]] =
               try
-                val id = attempt(n)
+                val id = Tracing.span("booking.attempt", "attempt" -> n.toString, "hold" -> hold.toString)(attempt(n))
                 val appointment = db.run(s => reader.get(s, id)).get
                 if hold then Metrics.holds.labelValues("created").inc()
                 else Metrics.bookingsCreated.labelValues(dealership.code, if input.packageId.isDefined then "package" else "consultation").inc()
