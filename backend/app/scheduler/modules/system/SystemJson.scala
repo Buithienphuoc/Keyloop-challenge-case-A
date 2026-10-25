@@ -9,3 +9,4 @@ import scheduler.shared.JsonFormats.given
 object SystemJson:
   given OWrites[DealershipSummary] = Json.writes[DealershipSummary]
   given OWrites[Onboarded] = Json.writes[Onboarded]
+  given OWrites[PackageRecord] = Json.writes[PackageRecord]

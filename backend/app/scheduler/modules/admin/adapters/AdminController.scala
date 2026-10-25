@@ -39,8 +39,10 @@ final class AdminController(cc: ControllerComponents, guard: Guard, admin: Works
     }
   }
 
-  def activeResources: Action[AnyContent] = guard(SERVICE_ADVISOR, ADMIN).async(req => json()(admin.activeResources(req.auth)))
+  def activeResources: Action[AnyContent] = guard(SERVICE_ADVISOR, ADMIN, WORKSHOP_CONTROLLER).async(req => json()(admin.activeResources(req.auth)))
 
   def listStaff: Action[AnyContent] = onlyAdmin.async(req => json()(admin.listStaff(req.auth)))
 
   def addStaff: Action[AnyContent] = onlyAdmin.async(req => json(Created)(admin.addStaff(req.auth, body[NewStaff](req), req.log)))
+
+  def updateHours: Action[AnyContent] = onlyAdmin.async(req => json()(admin.updateHours(req.auth, body[Hours](req), req.log)))

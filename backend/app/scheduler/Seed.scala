@@ -90,17 +90,58 @@ object Seed:
       Seq("Cooling performance test", "Refrigerant pressure", "Leak detection", "Cabin filter check"))
   )
 
-  /** Idempotent: does nothing if any dealership already exists. Returns whether data was loaded. */
+  /**
+   * Idempotent: loads the demo data only if no dealership exists, then adds the demo data of
+   * later releases (new roles, parts) where it is missing, so an existing database is upgraded
+   * too. Several API instances may start at once: an advisory lock lets one seed at a time.
+   * Returns whether the base data was loaded.
+   */
   def demoData(db: Db, log: Log, now: Instant = Instant.now()): Boolean =
-    val empty = db.run { s =>
+    val pw = Passwords.hash(DemoPassword)
+    val (loaded, added) = db.tx { s =>
       given Connection = Sql.connection(s)
-      SQL"SELECT 1 FROM dealerships LIMIT 1".as(SqlParser.scalar[Int].singleOpt).isEmpty
+      SQL"SELECT pg_advisory_xact_lock(hashtextextended('scheduler:seed', 0))".execute()
+      val empty = SQL"SELECT 1 FROM dealerships LIMIT 1".as(SqlParser.scalar[Int].singleOpt).isEmpty
+      if empty then load(s, pw, now)
+      (empty, topUp(s, pw))
     }
-    if empty then
-      val pw = Passwords.hash(DemoPassword)
-      db.tx(s => load(s, pw, now))
-      log.info("seed.demo_data_loaded", "demoPasswordInReadme" -> true)
-    empty
+    if loaded then log.info("seed.demo_data_loaded", "demoPasswordInReadme" -> true)
+    if added > 0 then log.info("seed.demo_data_topped_up", "rowsAdded" -> added)
+    loaded
+
+  /** Demo accounts and parts added after the first release. Inserts only what is missing. */
+  private def topUp(s: DbSession, pw: String): Int =
+    given Connection = Sql.connection(s)
+    val dealerships = SQL"SELECT code, id FROM dealerships WHERE code IN ('HCM-D1', 'HCM-TD')"
+      .as(Sql.rows(r => r.str("code") -> r.uuid("id")).*).toMap
+    def user(email: String, fullName: String, role: String, dealershipId: String): Int =
+      SQL"""INSERT INTO users (email, password_hash, full_name, role, dealership_id)
+            VALUES ($email, $pw, $fullName, $role, $dealershipId::uuid) ON CONFLICT ((lower(email))) DO NOTHING""".executeUpdate()
+    def part(dealershipId: String, sku: String, name: String, price: Int, stock: Int): Int =
+      SQL"""INSERT INTO parts (dealership_id, sku, name, unit_price, stock_qty)
+            VALUES ($dealershipId::uuid, $sku, $name, $price, $stock) ON CONFLICT (dealership_id, sku) DO NOTHING""".executeUpdate()
+
+    val counts = dealerships.toSeq.flatMap { (code, id) =>
+      val suffix = code.stripPrefix("HCM-").toLowerCase
+      Seq(
+        user(s"controller.$suffix@demo.vn", if suffix == "d1" then "Hoàng Văn Nam" else "Trịnh Thu Trang", "WORKSHOP_CONTROLLER", id),
+        user(s"parts.$suffix@demo.vn", if suffix == "d1" then "Mai Xuân Phúc" else "Đinh Thị Hoa", "PARTS_STAFF", id)
+      ) ++ Parts.map((sku, name, price, stock) => part(id, sku, name, price, stock))
+    }
+    counts.sum
+
+  private val Parts = Seq(
+    ("OIL-10W40-1L", "Engine oil 10W-40, 1 L", 145_000, 40),
+    ("OIL-FILTER-MB", "Oil filter (motorbike)", 65_000, 25),
+    ("SPARK-NGK-CPR8", "Spark plug NGK CPR8EA-9", 85_000, 30),
+    ("BRAKE-PAD-F-MB", "Front brake pads (motorbike)", 180_000, 12),
+    ("CHAIN-KIT-428", "Chain and sprocket kit 428", 650_000, 3),
+    ("AIR-FILTER-AB", "Air filter Honda Air Blade", 120_000, 8),
+    ("BATTERY-12V5", "Battery 12 V 5 Ah", 520_000, 4),
+    ("LED-HEAD-H4", "LED headlight bulb H4 (E-marked)", 390_000, 2),
+    ("EXHAUST-SLIPON", "Slip-on exhaust, homologated", 3_200_000, 0),
+    ("CAR-OIL-FILTER", "Oil filter (car)", 210_000, 10)
+  )
 
   private def load(s: DbSession, pw: String, now: Instant): Unit =
     given Connection = Sql.connection(s)
@@ -212,7 +253,7 @@ object Seed:
     for (hour, vehicleId) <- plan do
       val start = dayStart.withHour(hour)
       val resources = store.activeResources(s, dealershipId)
-      val busy = store.busyPeriods(s, dealershipId, dayStart.toInstant, dayStart.plusDays(1).toInstant)
+      val busy = store.busyPeriods(s, dealershipId, dayStart.toInstant, dayStart.plusDays(1).toInstant, now)
       Availability.allocate(requirement, start, resources.bays, resources.technicians, busy).allocation.foreach { a =>
         val customerId = owner(vehicleId)
         val appointmentId = store.insert(s, NewAppointment(

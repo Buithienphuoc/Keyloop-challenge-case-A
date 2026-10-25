@@ -48,14 +48,32 @@ object AdminRequests:
       (__ \ "email").read(Validate.email) and
       (__ \ "password").read(IdentityRequests.password) and
       (__ \ "phone").readNullable(Validate.text(0, 30)).map(_.filter(_.nonEmpty)) and
-      (__ \ "role").read(Validate.oneOf(Array(Role.SERVICE_ADVISOR, Role.ADMIN)))
+      (__ \ "role").read(Validate.oneOf(Array(Role.SERVICE_ADVISOR, Role.ADMIN, Role.WORKSHOP_CONTROLLER, Role.PARTS_STAFF)))
   )(NewStaff.apply)
+
+  final case class Hours(
+      openingTime: LocalTime,
+      closingTime: LocalTime,
+      openDays: List[Int],
+      slotMinutes: Int,
+      minLeadMinutes: Int,
+      maxDaysAhead: Int
+  )
+  given Reads[Hours] = (
+    (__ \ "openingTime").read(Validate.hhmm) and
+      (__ \ "closingTime").read(Validate.hhmm) and
+      (__ \ "openDays").read(weekdays) and
+      (__ \ "slotMinutes").read(Reads.IntReads.filter(Validate.error("Must be 15, 30 or 60"))(Set(15, 30, 60))) and
+      (__ \ "minLeadMinutes").read(Validate.int(0, 7 * 24 * 60)) and
+      (__ \ "maxDaysAhead").read(Validate.int(1, 365))
+  )(Hours.apply)
 
   final case class SetActive(isActive: Boolean)
   given Reads[SetActive] = (__ \ "isActive").read[Boolean].map(SetActive.apply)
 
 final case class BayCreated(id: String, name: String, bayType: String, isActive: Boolean)
 final case class WorkshopView(bays: Seq[BayRecord], technicians: Seq[TechnicianRecord])
+final case class HoursUpdated(hours: WorkshopHours, upcomingOutsideHours: Int)
 
 /** Dealership administration: bays, technicians (skills, shifts) and staff accounts, always for the caller's own dealership. */
 final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity: IdentityService):
@@ -98,6 +116,17 @@ final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity:
   def activeResources(auth: AuthContext): WorkshopView =
     val dealershipId = dealershipOf(auth)
     WorkshopView(workshop.listBays(dealershipId, onlyActive = true), workshop.listTechnicians(dealershipId, onlyActive = true))
+
+  /** Opening hours and booking rules. New bookings follow them at once; existing ones are kept. */
+  def updateHours(auth: AuthContext, input: Hours, log: Log): HoursUpdated =
+    if !input.openingTime.isBefore(input.closingTime) then
+      throw AppError.unprocessable("INVALID_HOURS", "Closing time must be after opening time")
+    val hours = WorkshopHours(input.openingTime, input.closingTime, input.openDays.distinct.sorted, input.slotMinutes,
+      input.minLeadMinutes, input.maxDaysAhead)
+    val outside = workshop.updateHours(dealershipOf(auth), hours)
+    log.info("admin.hours_updated", "openingTime" -> hours.openingTime.toString, "closingTime" -> hours.closingTime.toString,
+      "openDays" -> hours.openDays, "upcomingOutsideHours" -> outside)
+    HoursUpdated(hours, outside)
 
   def listStaff(auth: AuthContext): Seq[StaffMember] = identity.listStaff(dealershipOf(auth))
 

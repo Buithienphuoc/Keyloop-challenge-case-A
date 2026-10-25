@@ -6,28 +6,35 @@ import AppointmentStatus.*
 /**
  * Appointment lifecycle.
  *
- *   CONFIRMED ──start──▶ IN_PROGRESS ──finish──▶ COMPLETED
- *       │
- *       ├──cancel──▶ CANCELLED   (only before work starts)
- *       └──no-show─▶ NO_SHOW     (only once the start time has passed)
+ *   HELD ──confirm──▶ CONFIRMED ──start──▶ IN_PROGRESS ──finish──▶ COMPLETED
+ *    │                    │
+ *    ├──release──▶ CANCELLED ◀──cancel──┤  (only before work starts)
+ *    └──time out─▶ EXPIRED              └──no-show─▶ NO_SHOW  (only once the start time has passed)
+ *
+ * A hold is confirmed through its own endpoint (it has an expiry check); time-outs are
+ * applied by the system, never by a person.
  */
 object Lifecycle:
   private val Transitions: Map[AppointmentStatus, Set[AppointmentStatus]] = Map(
+    HELD -> Set(CONFIRMED, CANCELLED, EXPIRED),
     CONFIRMED -> Set(IN_PROGRESS, CANCELLED, NO_SHOW),
     IN_PROGRESS -> Set(COMPLETED),
     COMPLETED -> Set.empty,
     CANCELLED -> Set.empty,
-    NO_SHOW -> Set.empty
+    NO_SHOW -> Set.empty,
+    EXPIRED -> Set.empty
   )
 
   def canTransition(from: AppointmentStatus, to: AppointmentStatus): Boolean = Transitions(from).contains(to)
 
   /** Which roles may move an appointment into which status (ownership is checked separately). */
   private val AllowedByRole: Map[Role, Set[AppointmentStatus]] = Map(
-    Role.CUSTOMER -> Set(CANCELLED),
+    Role.CUSTOMER -> Set(CONFIRMED, CANCELLED),
     Role.SERVICE_ADVISOR -> Set(IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW),
     Role.ADMIN -> Set(IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW),
     Role.TECHNICIAN -> Set(IN_PROGRESS, COMPLETED),
+    Role.WORKSHOP_CONTROLLER -> Set.empty,
+    Role.PARTS_STAFF -> Set.empty,
     Role.SYSTEM_MANAGER -> Set.empty
   )
 

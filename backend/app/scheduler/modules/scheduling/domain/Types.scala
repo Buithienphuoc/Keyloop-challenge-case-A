@@ -6,11 +6,12 @@ enum VehicleType:
   case MOTORBIKE, CAR
 
 enum AppointmentStatus:
-  case CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
+  /** HELD: reserved for a few minutes while the customer confirms. EXPIRED: a hold that ran out. */
+  case HELD, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW, EXPIRED
 
 object AppointmentStatus:
   /** Statuses in which an appointment still holds its bay, technician and vehicle. */
-  val Active: Set[AppointmentStatus] = Set(CONFIRMED, IN_PROGRESS)
+  val Active: Set[AppointmentStatus] = Set(HELD, CONFIRMED, IN_PROGRESS)
 
 /** Opening hours and booking rules of one dealership's workshop. */
 final case class WorkshopRules(

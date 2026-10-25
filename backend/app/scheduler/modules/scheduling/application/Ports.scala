@@ -4,7 +4,7 @@ import java.time.{Instant, ZonedDateTime}
 
 import scheduler.modules.catalog.Money
 import scheduler.modules.consultation.BookableConsultation
-import scheduler.modules.scheduling.domain.{AppointmentStatus, Bay, BusyPeriod, Technician, VehicleType}
+import scheduler.modules.scheduling.domain.{AppointmentStatus, Bay, BusyPeriod, Requirement, Technician, VehicleType}
 import scheduler.shared.DbSession
 
 /** Read model returned by the API. */
@@ -23,7 +23,9 @@ final case class AppointmentView(
     technician: AppointmentView.Ref,
     customerNote: Option[String],
     cancelReason: Option[String],
-    createdAt: Instant
+    createdAt: Instant,
+    /** Only while HELD: when the hold runs out unless the customer confirms. */
+    holdExpiresAt: Option[Instant] = None
 )
 
 object AppointmentView:
@@ -53,7 +55,9 @@ final case class NewAppointment(
     end: Instant,
     customerNote: Option[String],
     idempotencyKey: Option[String],
-    createdBy: String
+    createdBy: String,
+    status: AppointmentStatus = AppointmentStatus.CONFIRMED,
+    holdExpiresAt: Option[Instant] = None
 )
 
 final case class AppointmentFilter(
@@ -71,7 +75,8 @@ final case class LockedAppointment(
     dealershipId: String,
     customerId: String,
     technicianId: String,
-    consultationRequestId: Option[String]
+    consultationRequestId: Option[String],
+    holdExpiresAt: Option[Instant] = None
 )
 
 final case class AppointmentEvent(
@@ -84,19 +89,43 @@ final case class AppointmentEvent(
 
 final case class WorkshopResources(bays: Seq[Bay], technicians: Seq[Technician])
 
+/** A hold that ran out and was released (its consultation, if any, must be reopened). */
+final case class ExpiredHold(appointmentId: String, consultationRequestId: Option[String])
+
+/** Which holds an expiry sweep looks at. */
+enum HoldScope:
+  /** Every dealership (the background sweeper). */
+  case Everywhere
+  /** Holds that could block one booking: same dealership and time range, or the same vehicle. */
+  case Around(dealershipId: String, vehicleId: Option[String], from: Instant, to: Instant)
+
+/** What moving a job to another bay or technician needs to know about it. */
+final case class JobDetails(
+    id: String,
+    dealershipId: String,
+    status: AppointmentStatus,
+    start: Instant,
+    end: Instant,
+    bayId: String,
+    technicianId: String,
+    requirement: Requirement
+)
+
 // ---- persistence ports, split by who uses them (ISP) ----------------------------------------
 // Every method takes the session so the caller controls the transaction.
 
 /** What computing availability needs. */
 trait ResourceCalendar:
   def activeResources(s: DbSession, dealershipId: String): WorkshopResources
-  def busyPeriods(s: DbSession, dealershipId: String, from: Instant, to: Instant): Seq[BusyPeriod]
+  /** Bookings and unexpired holds (as of `asOf`) that overlap [from, to). */
+  def busyPeriods(s: DbSession, dealershipId: String, from: Instant, to: Instant, asOf: Instant): Seq[BusyPeriod]
 
 /** Reading appointments. */
 trait AppointmentReader:
   def get(s: DbSession, id: String): Option[AppointmentView]
   def list(s: DbSession, filter: AppointmentFilter): Seq[AppointmentView]
   def technicianIdForUser(s: DbSession, userId: String): Option[String]
+  def jobDetails(s: DbSession, id: String): Option[JobDetails]
 
 /** Writing appointments. */
 trait AppointmentWriter:
@@ -114,6 +143,12 @@ trait AppointmentWriter:
   def lockForUpdate(s: DbSession, id: String): Option[LockedAppointment]
   def setStatus(s: DbSession, id: String, status: AppointmentStatus, cancelReason: Option[String]): Unit
   def recordEvent(s: DbSession, e: AppointmentEvent): Unit
+
+  /** Moves holds that ran out (as of `asOf`) to EXPIRED, with an audit event each. */
+  def expireHolds(s: DbSession, asOf: Instant, scope: HoldScope): Seq[ExpiredHold]
+
+  /** Moves a job to another bay and/or technician. Throws SlotTakenError when either is busy then. */
+  def reassign(s: DbSession, id: String, bayId: String, technicianId: String): Unit
 
 /** The whole store, as implemented by the PostgreSQL adapter. */
 trait SchedulingStore extends ResourceCalendar, AppointmentReader, AppointmentWriter

@@ -49,6 +49,8 @@ final class BookingService(
     workshop: WorkshopContext,
     availability: AvailabilityService,
     clock: () => Instant,
+    /** How long a hold keeps its slot while the customer confirms. */
+    holdMinutes: Int = 10,
     /** Pause between retries; injectable so unit tests do not wait. */
     backoff: Int => Unit = BookingService.jitter
 ):
@@ -62,8 +64,12 @@ final class BookingService(
    *     broke a deadlock (TransientStorageError), retry with fresh data, up to MaxAttempts;
    *  4. if nothing is left, answer 409 with the nearest alternative slots.
    * Requests with the same Idempotency-Key queue on a lock and the later ones replay the first.
+   *
+   * With `hold = true` the slot is only reserved (HELD) until `holdMinutes` from now; the
+   * customer confirms it with AppointmentService.confirmHold. A hold takes the bay, technician
+   * and vehicle exactly like a booking, so the same constraints and retries apply.
    */
-  def book(auth: AuthContext, input: BookRequest, idempotencyKey: Option[String], log: Log): BookingResult =
+  def book(auth: AuthContext, input: BookRequest, idempotencyKey: Option[String], log: Log, hold: Boolean = false): BookingResult =
     if auth.role != Role.CUSTOMER then throw AppError.forbidden("Only customers can book for themselves")
 
     idempotencyKey.flatMap(replay(auth, _, log)) match
@@ -77,7 +83,10 @@ final class BookingService(
           case Right(start) => start
           case Left(error)  => throw AppError.unprocessable(error.toString, StartErrors(error))
         val end = start.plusMinutes(requirement.durationMinutes)
-        val ctx = Seq("dealershipId" -> dealership.id, "start" -> JsonFormats.offsetIso(start), "durationMinutes" -> requirement.durationMinutes)
+        val ctx = Seq("dealershipId" -> dealership.id, "start" -> JsonFormats.offsetIso(start), "durationMinutes" -> requirement.durationMinutes,
+          "hold" -> hold)
+        val (status, holdExpiresAt) =
+          if hold then (AppointmentStatus.HELD, Some(clock().plusSeconds(holdMinutes * 60L))) else (AppointmentStatus.CONFIRMED, None)
 
         /** One booking attempt in its own transaction; returns the new appointment's id. */
         def attempt(n: Int): String = db.tx { s =>
@@ -89,7 +98,15 @@ final class BookingService(
           if !isOfferedHere(requirement, bays, technicians) then
             throw AppError.unprocessable("NOT_OFFERED_HERE", "This dealership has no bay or technician for this job")
           val dayStart = start.toLocalDate.atStartOfDay(rules.timezone).toInstant
-          val busy = calendar.busyPeriods(s, dealership.id, dayStart, start.toLocalDate.plusDays(1).atStartOfDay(rules.timezone).toInstant)
+          val dayEnd = start.toLocalDate.plusDays(1).atStartOfDay(rules.timezone).toInstant
+          // Holds that ran out still occupy their rows until released; release the ones that
+          // could stand in this booking's way, so the constraints only see live reservations.
+          val now = clock()
+          writer.expireHolds(s, now, HoldScope.Around(dealership.id, Some(vehicle.id), dayStart, dayEnd)).foreach { h =>
+            h.consultationRequestId.foreach(consultations.reopen(s, _))
+            Metrics.holds.labelValues("expired").inc()
+          }
+          val busy = calendar.busyPeriods(s, dealership.id, dayStart, dayEnd, now)
           val allocation = Availability.allocate(requirement, start, bays, technicians, busy).allocation.getOrElse(throw NoCapacity())
 
           input.consultationRequestId.foreach { id =>
@@ -111,10 +128,12 @@ final class BookingService(
               end = end.toInstant,
               customerNote = input.customerNote,
               idempotencyKey = idempotencyKey,
-              createdBy = auth.userId
+              createdBy = auth.userId,
+              status = status,
+              holdExpiresAt = holdExpiresAt
             )
           )
-          writer.recordEvent(s, AppointmentEvent(appointmentId, None, AppointmentStatus.CONFIRMED, auth.userId, None))
+          writer.recordEvent(s, AppointmentEvent(appointmentId, None, status, auth.userId, None))
           log.debug("booking.allocated", ctx ++ Seq("attempt" -> n, "bayId" -> allocation.bay.id, "technicianId" -> allocation.technician.id)*)
           appointmentId
         }
@@ -127,8 +146,9 @@ final class BookingService(
               try
                 val id = attempt(n)
                 val appointment = db.run(s => reader.get(s, id)).get
-                Metrics.bookingsCreated.labelValues(dealership.code, if input.packageId.isDefined then "package" else "consultation").inc()
-                log.info("booking.created", ctx ++ Seq("appointmentId" -> id, "reference" -> appointment.reference, "attempt" -> n,
+                if hold then Metrics.holds.labelValues("created").inc()
+                else Metrics.bookingsCreated.labelValues(dealership.code, if input.packageId.isDefined then "package" else "consultation").inc()
+                log.info(if hold then "booking.held" else "booking.created", ctx ++ Seq("appointmentId" -> id, "reference" -> appointment.reference, "attempt" -> n,
                   "bayId" -> appointment.bay.id, "technicianId" -> appointment.technician.id)*)
                 Right(Some(BookingResult(appointment, replayed = false)))
               catch

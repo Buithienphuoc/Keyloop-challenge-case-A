@@ -35,4 +35,14 @@ class LifecycleSpec extends AnyFunSpec with Matchers:
       checkTransition(CONFIRMED, CANCELLED, Role.TECHNICIAN, Start, Start) shouldBe Some(ROLE_NOT_ALLOWED)
       checkTransition(CONFIRMED, IN_PROGRESS, Role.TECHNICIAN, Start, Start) shouldBe None
     }
+
+    it("lets a hold be confirmed, released or time out, and nothing else") {
+      canTransition(HELD, CONFIRMED) shouldBe true
+      canTransition(HELD, CANCELLED) shouldBe true
+      canTransition(HELD, EXPIRED) shouldBe true
+      canTransition(HELD, IN_PROGRESS) shouldBe false
+      canTransition(EXPIRED, CONFIRMED) shouldBe false
+      checkTransition(HELD, CONFIRMED, Role.CUSTOMER, Start, Start - 1) shouldBe None
+      checkTransition(HELD, CONFIRMED, Role.SERVICE_ADVISOR, Start, Start - 1) shouldBe Some(ROLE_NOT_ALLOWED)
+    }
   }
