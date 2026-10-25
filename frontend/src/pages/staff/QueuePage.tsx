@@ -4,7 +4,7 @@ import { get, post } from '../../api/client';
 import { useReferenceData } from '../../api/hooks';
 import type { Consultation, ConsultationStatus } from '../../api/types';
 import { Empty, ErrorNote, Loading, PageHead, Plate, RequestPill } from '../../components/ui';
-import { dt, duration, money, time, vehicleName } from '../../lib/format';
+import { dt, duration, money, stamp, time, vehicleName } from '../../lib/format';
 
 const TABS: { id: ConsultationStatus | 'ALL'; label: string }[] = [
   { id: 'SUBMITTED', label: 'Waiting for advice' },
@@ -65,7 +65,7 @@ function RequestCard({ c }: { c: Consultation }) {
       <p className="small muted">
         {c.customer.fullName}
         {c.customer.phone ? ` · ${c.customer.phone}` : ''} · {vehicleName(c.vehicle)} ({c.vehicle.vehicleType === 'CAR' ? 'car' : 'motorbike'}) · sent{' '}
-        {dt(c.createdAt).toFormat('d LLL, HH:mm')}
+        {stamp(c.createdAt)}
       </p>
       <p>
         <span className="muted small">{c.areas.map(areaName).join(', ')}:</span> {c.description}

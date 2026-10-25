@@ -7,7 +7,7 @@ import type { Appointment, AppointmentStatus } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { DayNav } from '../../components/DayNav';
 import { Empty, ErrorNote, Loading, PageHead, Plate, StatusPill } from '../../components/ui';
-import { dt, money, time, todayIn, vehicleName } from '../../lib/format';
+import { dt, money, stamp, time, todayIn, vehicleName } from '../../lib/format';
 
 interface Resources {
   bays: { id: string; name: string; bayType: string; bayTypeName: string }[];
@@ -235,7 +235,7 @@ function JobPanel({ a, date, onClose }: { a: Appointment; date: string; onClose:
           </button>
         )}
       </div>
-      <p className="muted small">Booked {dt(a.createdAt).toFormat('d LLL, HH:mm')}</p>
+      <p className="muted small">Booked {stamp(a.createdAt, a.dealership.timezone)}</p>
     </div>
   );
 }

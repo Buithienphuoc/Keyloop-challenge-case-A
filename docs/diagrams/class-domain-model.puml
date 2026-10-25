@@ -1,6 +1,6 @@
 @startuml class-domain-model
 !include _style.iuml
-title Domain model (persisted entities, from migrations/001_init.sql)
+title Domain model (persisted entities, from V1__init.sql)
 skinparam ClassBorderColor #1D4E89
 skinparam ClassBackgroundColor #FFFFFF
 skinparam ClassHeaderBackgroundColor #E6EEF7

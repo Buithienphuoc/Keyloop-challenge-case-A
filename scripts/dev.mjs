@@ -1,6 +1,7 @@
 // Starts the Scala / Play API (with an embedded PostgreSQL unless DATABASE_URL is set) and the web app together.
 // Needs JDK 21, sbt and Node.js.
 import { spawn, spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const windows = process.platform === 'win32';
 
@@ -12,9 +13,10 @@ const missing = [
   !onPath('java') && 'JDK 21+   https://adoptium.net/  (Windows: winget install Microsoft.OpenJDK.21)',
   !onPath('sbt') && 'sbt 1.10+ https://www.scala-sbt.org/download/  (Windows: the .msi installer)',
 ].filter(Boolean);
+if (!existsSync('frontend/node_modules')) missing.push('web app dependencies: run `npm run setup` first');
 if (missing.length) {
-  console.error('\nThe API needs these tools on your PATH:\n  ' + missing.join('\n  '));
-  console.error('Install them, open a new terminal, and run `npm run dev` again.\n');
+  console.error('\nMissing before the app can start:\n  ' + missing.join('\n  '));
+  console.error('Fix these (open a new terminal after installing tools), then run `npm run dev` again.\n');
   process.exit(1);
 }
 
@@ -53,5 +55,5 @@ function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
-console.log('\nOpen http://localhost:5173  (API docs: http://localhost:8080/docs)');
+console.log('\nOpen http://localhost:5173  (API docs: http://localhost:8081/docs)');
 console.log('The first start compiles the Scala code (a minute or two); the API answers once it is ready.\n');

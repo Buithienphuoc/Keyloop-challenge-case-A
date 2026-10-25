@@ -4,7 +4,7 @@ import { post } from '../../api/client';
 import { keys, useMyRequests, useReferenceData } from '../../api/hooks';
 import type { Consultation } from '../../api/types';
 import { Empty, ErrorNote, Loading, PageHead, Plate, RequestPill } from '../../components/ui';
-import { dt, duration, money, time, vehicleName } from '../../lib/format';
+import { dt, duration, money, stamp, time, vehicleName } from '../../lib/format';
 
 export function RequestsPage() {
   const [params] = useSearchParams();
@@ -63,7 +63,7 @@ function RequestItem({ r, areaName }: { r: Consultation; areaName: (c: string) =
         <Plate text={r.vehicle.plate} />
       </div>
       <p className="small muted">
-        {vehicleName(r.vehicle)} · {r.dealership.name} · sent {dt(r.createdAt).toFormat('d LLL, HH:mm')}
+        {vehicleName(r.vehicle)} · {r.dealership.name} · sent {stamp(r.createdAt)}
       </p>
       <p>
         <span className="muted small">{r.areas.map(areaName).join(', ')}:</span> {r.description}
