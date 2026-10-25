@@ -1,0 +1,156 @@
+# Continuous integration and delivery.
+#
+#   every pull request and push: backend tests, web app lint/typecheck/build, both Docker images build
+#   push to master:              images are pushed to Azure Container Registry and rolled out to
+#                                Azure Container Apps, then the live site is smoke-tested
+#
+# The deploy job runs only once deploy/azure/setup.sh has been run and its three outputs saved as
+# repository variables (Settings → Secrets and variables → Actions → Variables):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID   (+ optional AZURE_RESOURCE_GROUP, AZURE_ACR)
+# GitHub signs in to Azure with OpenID Connect, so no password is stored anywhere.
+name: CI/CD
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests (Scala 3 / Play)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      # Unit, integration (embedded PostgreSQL 17) and architecture tests.
+      - run: sbt -batch test
+
+  frontend:
+    name: Web app (lint, typecheck, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  images:
+    name: Docker images
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    permissions:
+      contents: read
+      id-token: write # OpenID Connect sign-in to Azure
+    env:
+      DEPLOY: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AZURE_CLIENT_ID != '' }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-service-scheduler' }}
+    outputs:
+      registry: ${{ steps.registry.outputs.server }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to Azure
+        if: env.DEPLOY == 'true'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign in to the container registry
+        id: registry
+        if: env.DEPLOY == 'true'
+        run: |
+          acr="${{ vars.AZURE_ACR }}"
+          [ -n "$acr" ] || acr=$(az acr list -g "$RESOURCE_GROUP" --query '[0].name' -o tsv)
+          az acr login --name "$acr"
+          echo "server=$(az acr show -n "$acr" --query loginServer -o tsv)" >> "$GITHUB_OUTPUT"
+
+      - name: API image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: ${{ env.DEPLOY == 'true' }}
+          tags: ${{ steps.registry.outputs.server || 'local' }}/service-scheduler-api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - name: Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: ${{ env.DEPLOY == 'true' }}
+          tags: ${{ steps.registry.outputs.server || 'local' }}/service-scheduler-web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  deploy:
+    name: Deploy to Azure Container Apps
+    runs-on: ubuntu-latest
+    needs: images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AZURE_CLIENT_ID != ''
+    environment:
+      name: production
+      url: ${{ steps.rollout.outputs.url }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-service-scheduler' }}
+      REGISTRY: ${{ needs.images.outputs.registry }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Roll out the new images
+        id: rollout
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt --only-show-errors
+          # API first: the database migrates on its start-up, before the new web app needs it.
+          az containerapp update -g "$RESOURCE_GROUP" -n scheduler-api \
+            --image "$REGISTRY/service-scheduler-api:${{ github.sha }}" --only-show-errors -o none
+          # The apps are created with a placeholder image on port 80; point ingress at our ports.
+          [ "$(az containerapp show -g "$RESOURCE_GROUP" -n scheduler-api --query properties.configuration.ingress.targetPort -o tsv)" = 8081 ] ||
+            az containerapp ingress update -g "$RESOURCE_GROUP" -n scheduler-api --target-port 8081 -o none
+          az containerapp update -g "$RESOURCE_GROUP" -n scheduler-web \
+            --image "$REGISTRY/service-scheduler-web:${{ github.sha }}" --only-show-errors -o none
+          [ "$(az containerapp show -g "$RESOURCE_GROUP" -n scheduler-web --query properties.configuration.ingress.targetPort -o tsv)" = 8080 ] ||
+            az containerapp ingress update -g "$RESOURCE_GROUP" -n scheduler-web --target-port 8080 -o none
+          fqdn=$(az containerapp show -g "$RESOURCE_GROUP" -n scheduler-web --query properties.configuration.ingress.fqdn -o tsv)
+          echo "url=https://$fqdn" >> "$GITHUB_OUTPUT"
+      - name: Smoke test
+        run: |
+          url="${{ steps.rollout.outputs.url }}"
+          for i in $(seq 1 40); do
+            if curl -fsS "$url/health" && curl -fsS -o /dev/null "$url/"; then
+              echo; echo "Live at $url"; exit 0
+            fi
+            sleep 10
+          done
+          echo "The site did not become healthy in time" >&2; exit 1
