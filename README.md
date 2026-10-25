@@ -17,10 +17,10 @@ Maven Central) and loads demo data.
 
 ```bash
 npm run setup     # install the web app's dependencies
-npm run dev       # API on :8080 (sbt run + embedded PostgreSQL), web app on :5173
+npm run dev       # API on :8081 (sbt run + embedded PostgreSQL), web app on :5173
 ```
 
-Open <http://localhost:5173>. API documentation (Swagger UI): <http://localhost:8080/docs>.
+Open <http://localhost:5173>. API documentation (Swagger UI): <http://localhost:8081/docs>.
 The first start downloads dependencies and compiles the Scala code, so give it a minute or two.
 
 Scala version: 3.3.6 (LTS) by default. The build and all tests also pass on 3.9.0 and 3.10.0;
@@ -49,7 +49,7 @@ Using your own PostgreSQL instead: `docker compose up -d`, then
 | Setting (env var) | Default | Meaning |
 | --- | --- | --- |
 | `DATABASE_URL` | empty → embedded PostgreSQL | `postgres://…` or `jdbc:postgresql://…` |
-| `PORT` | 8080 | HTTP port (packaged server) |
+| `PORT` | 8081 | HTTP port (packaged server) |
 | `CORS_ORIGIN` | `http://localhost:5173` | Comma-separated allowed browser origins |
 | `SEED_DEMO_DATA` | true | Load demo data into an empty database |
 | `LOG_FORMAT` / `LOG_LEVEL` | json / INFO | `pretty` for readable local lines |

@@ -1,0 +1,235 @@
+@startuml erd
+!include _style.iuml
+title Entity relationship diagram (PostgreSQL schema, backend/conf/db/migration/V1__init.sql + Flyway)
+hide circle
+hide methods
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 60
+skinparam ClassBorderColor #1F2A30
+skinparam ClassFontStyle bold
+
+' Colour key: green = business domain, red = authentication / authorisation,
+' orange = framework infrastructure (Flyway migrations run inside the Play app).
+!define DOMAIN #C8E6C9
+!define AUTH #FFCDD2
+!define FRAMEWORK #FFE0B2
+
+legend top left
+  |<back:#C8E6C9>   </back>| Business domain |
+  |<back:#FFCDD2>   </back>| Authentication / authorisation |
+  |<back:#FFE0B2>   </back>| Play / framework infrastructure |
+  PK = primary key, FK = foreign key, UQ = unique
+endlegend
+
+entity "users" as users AUTH {
+  * id : uuid <<PK>>
+  --
+  * email : text <<UQ lower(email)>>
+  * password_hash : text (PBKDF2-SHA512)
+  * full_name : text
+  phone : text
+  * role : CUSTOMER | SERVICE_ADVISOR | TECHNICIAN | ADMIN | SYSTEM_MANAGER
+  dealership_id : uuid <<FK>> (staff only)
+  * is_active : boolean
+  * created_at : timestamptz
+}
+
+entity "sessions" as sessions AUTH {
+  * token_hash : text <<PK>> (sha256 of bearer token)
+  --
+  * user_id : uuid <<FK>>
+  * created_at : timestamptz
+  * expires_at : timestamptz
+  revoked_at : timestamptz
+}
+
+entity "flyway_schema_history" as flyway FRAMEWORK {
+  * installed_rank : integer <<PK>>
+  --
+  version : varchar(50)
+  * description : varchar(200)
+  * type : varchar(20)
+  * script : varchar(1000)
+  checksum : integer
+  * installed_by : varchar(100)
+  * installed_on : timestamp
+  * execution_time : integer
+  * success : boolean
+}
+
+entity "dealerships" as dealerships DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * code : text <<UQ>>
+  * name, address : text
+  phone : text
+  * timezone : text (IANA)
+  * opening_time, closing_time : time
+  * open_days : smallint[]
+  * slot_minutes : 15 | 30 | 60
+  * min_lead_minutes : integer
+  * max_days_ahead : integer
+  * created_at : timestamptz
+}
+
+entity "skills" as skills DOMAIN {
+  * code : text <<PK>>
+  --
+  * name : text
+}
+
+entity "bay_types" as bay_types DOMAIN {
+  * code : text <<PK>>
+  --
+  * name : text
+  * vehicle_types : text[]
+}
+
+entity "service_bays" as bays DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * dealership_id : uuid <<FK>>
+  * name : text
+  * bay_type : text <<FK>>
+  * is_active : boolean
+  UQ (dealership_id, name), UQ (id, dealership_id)
+}
+
+entity "technicians" as techs DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * dealership_id : uuid <<FK>>
+  user_id : uuid <<FK, UQ>>
+  * display_name : text
+  * shift_start, shift_end : time
+  * work_days : smallint[]
+  * is_active : boolean
+}
+
+entity "technician_skills" as tskills DOMAIN {
+  * technician_id : uuid <<PK, FK>>
+  * skill_code : text <<PK, FK>>
+}
+
+entity "service_packages" as packages DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * code : text <<UQ>>
+  * name, description : text
+  * vehicle_type : MOTORBIKE | CAR
+  * duration_minutes : integer
+  * required_skill : text <<FK>>
+  * bay_type : text <<FK>>
+  * price_amount : integer, currency : text
+  * checklist : text[]
+  * is_recommended, is_active : boolean
+  * sort_order : integer
+}
+
+entity "vehicles" as vehicles DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * owner_id : uuid <<FK>>
+  * vehicle_type : MOTORBIKE | CAR
+  * make, model : text
+  year : smallint
+  * plate : text <<UQ per owner>>
+  vin : text (17 chars)
+  mileage_km : integer
+  * created_at : timestamptz
+}
+
+entity "consultation_requests" as consult DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * reference : text <<UQ>>
+  * customer_id : uuid <<FK>>
+  * vehicle_id : uuid <<FK>>
+  * dealership_id : uuid <<FK>>
+  * kind : INSPECTION | MODIFICATION
+  * areas : text[]
+  * description : text
+  * status : SUBMITTED | APPROVED | REJECTED | BOOKED | CANCELLED
+  advisor_id : uuid <<FK>>
+  advisor_note : text
+  duration_minutes : integer
+  required_skill : text <<FK>>
+  bay_type : text <<FK>>
+  estimated_price : integer
+  * created_at : timestamptz
+  reviewed_at : timestamptz
+}
+
+entity "appointments" as appts DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * reference : text <<UQ>>
+  * dealership_id : uuid <<FK>>
+  * customer_id : uuid <<FK>>
+  * vehicle_id : uuid <<FK>>
+  service_package_id : uuid <<FK>>
+  consultation_request_id : uuid <<FK>>
+  * bay_id : uuid <<FK (bay_id, dealership_id)>>
+  * technician_id : uuid <<FK (technician_id, dealership_id)>>
+  * period : tstzrange [start, end)
+  * status : CONFIRMED | IN_PROGRESS | COMPLETED | CANCELLED | NO_SHOW
+  customer_note : text
+  idempotency_key : text <<UQ per customer>>
+  * created_by : uuid <<FK>>
+  * created_at, updated_at : timestamptz
+  cancel_reason : text
+  ..
+  EXCLUDE bay / technician / vehicle overlap
+  while CONFIRMED or IN_PROGRESS
+}
+
+entity "appointment_events" as events DOMAIN {
+  * id : bigserial <<PK>>
+  --
+  * appointment_id : uuid <<FK>>
+  from_status : text
+  * to_status : text
+  * actor_id : uuid <<FK>>
+  note : text
+  * at : timestamptz
+}
+
+users ||--o{ sessions : "has"
+dealerships |o--o{ users : "employs (staff)"
+users ||--o{ vehicles : "owns"
+users |o--o| techs : "logs in as"
+
+dealerships ||--o{ bays : "has"
+dealerships ||--o{ techs : "employs"
+bay_types ||--o{ bays : "typed as"
+techs ||--o{ tskills
+skills ||--o{ tskills
+skills ||--o{ packages : "required"
+bay_types ||--o{ packages : "needs"
+
+users ||--o{ consult : "asks"
+vehicles ||--o{ consult
+dealerships ||--o{ consult
+skills |o--o{ consult
+bay_types |o--o{ consult
+
+dealerships ||--o{ appts
+users ||--o{ appts : "customer / created_by"
+vehicles ||--o{ appts
+packages |o--o{ appts
+consult |o--o| appts : "booked as"
+bays ||--o{ appts
+techs ||--o{ appts
+appts ||--o{ events : "audit trail"
+users ||--o{ events : "actor"
+
+note bottom of flyway
+  Created and owned by Flyway, which runs the
+  migrations from AppLoader when the Play app starts.
+  Play itself keeps no tables: the Play session cookie
+  is not used (auth is a bearer token in sessions), and
+  Play Evolutions is replaced by Flyway.
+  No foreign keys to the application tables.
+end note
+@enduml

@@ -13,6 +13,8 @@ export const dt = (iso: string) => DateTime.fromISO(iso, { setZone: true });
 export const time = (iso: string) => dt(iso).toFormat('HH:mm');
 export const dayLong = (iso: string) => dt(iso).toFormat('cccc d LLLL');
 export const dayShort = (iso: string) => dt(iso).toFormat('ccc d LLL');
+/** Record timestamps (createdAt, …) arrive in UTC; show them in the dealership's zone too. */
+export const stamp = (iso: string, zone = 'Asia/Ho_Chi_Minh') => DateTime.fromISO(iso).setZone(zone).toFormat('d LLL, HH:mm');
 export const whenLong = (iso: string) => `${dayLong(iso)}, ${time(iso)}`;
 
 export function duration(minutes: number): string {

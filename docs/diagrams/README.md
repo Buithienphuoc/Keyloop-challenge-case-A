@@ -21,6 +21,7 @@ was deliberately left out of this version.
 | Class, domain model (persisted entities) | [class-domain-model.png](class-domain-model.png) |
 | Class, application layer (scheduling and collaborators) | [class-application.png](class-application.png) |
 | Hexagonal architecture, as built | [hexagonal-architecture.png](hexagonal-architecture.png) |
+| Entity relationship (all tables; green domain, red auth, orange framework) | [erd.png](erd.png) |
 
 ![Use cases, customer](use-case-customer.png)
 ![Use cases, staff](use-case-staff.png)
@@ -33,6 +34,7 @@ was deliberately left out of this version.
 ![Domain model](class-domain-model.png)
 ![Application classes](class-application.png)
 ![Hexagonal architecture](hexagonal-architecture.png)
+![Entity relationship diagram](erd.png)
 
 ### Reading the structural diagrams
 
