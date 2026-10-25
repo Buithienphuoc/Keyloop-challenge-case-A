@@ -1,0 +1,184 @@
+@startuml class-domain-model
+!include _style.iuml
+title Domain model (persisted entities, from migrations/001_init.sql)
+skinparam ClassBorderColor #1D4E89
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassHeaderBackgroundColor #E6EEF7
+skinparam nodesep 60
+skinparam ranksep 70
+hide methods
+hide circle
+
+package "Tenant and workshop" {
+  class Dealership {
+    code : text <<unique>>
+    name, address, phone
+    timezone : IANA zone
+    openingTime, closingTime : time
+    openDays : weekday[]
+    slotMinutes : 15 | 30 | 60
+    minLeadMinutes, maxDaysAhead
+  }
+  class ServiceBay {
+    name
+    isActive
+  }
+  class Technician {
+    displayName
+    shiftStart, shiftEnd : time
+    workDays : weekday[]
+    isActive
+  }
+  class BayType <<reference>> {
+    code, name
+    vehicleTypes : VehicleType[]
+  }
+  class Skill <<reference>> {
+    code, name
+  }
+}
+
+package "Identity" {
+  class User {
+    email <<unique, case-insensitive>>
+    passwordHash : scrypt
+    fullName, phone
+    role : Role
+    isActive
+  }
+  class Session {
+    tokenHash : sha256 <<PK>>
+    expiresAt, revokedAt
+  }
+}
+
+package "Catalogue" {
+  class ServicePackage {
+    code, name, description
+    vehicleType : VehicleType
+    durationMinutes : multiple of 15
+    price : amount + currency
+    checklist : text[]
+    isRecommended
+  }
+}
+
+package "Customer" {
+  class Vehicle {
+    vehicleType : VehicleType
+    make, model, year
+    plate <<unique per owner>>
+    vin : 17 chars, optional
+    mileageKm
+  }
+}
+
+package "Scheduling" {
+  class ConsultationRequest {
+    reference : "CR-XXXXXX"
+    kind : ConsultationKind
+    areas : text[]
+    description
+    status : ConsultationStatus
+    advisorNote
+    durationMinutes, estimatedPrice
+    requiredSkill → Skill, bayType → BayType
+    createdAt, reviewedAt
+  }
+  class Appointment {
+    reference : "SV-XXXXXX"
+    period : tstzrange [start, end)
+    status : AppointmentStatus
+    customerNote, cancelReason
+    idempotencyKey <<unique per customer>>
+    createdAt, updatedAt
+  }
+  class AppointmentEvent <<audit>> {
+    fromStatus, toStatus
+    note, at
+  }
+}
+
+package "Enumerations" {
+enum Role {
+  CUSTOMER
+  SERVICE_ADVISOR
+  TECHNICIAN
+  ADMIN
+  SYSTEM_MANAGER
+}
+enum VehicleType {
+  MOTORBIKE
+  CAR
+}
+enum AppointmentStatus {
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+enum ConsultationStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  BOOKED
+  CANCELLED
+}
+enum ConsultationKind {
+  INSPECTION
+  MODIFICATION
+}
+}
+Role -[hidden]right- VehicleType
+VehicleType -[hidden]right- AppointmentStatus
+AppointmentStatus -[hidden]right- ConsultationStatus
+ConsultationStatus -[hidden]right- ConsultationKind
+AppointmentEvent -[hidden]down- Role
+
+Dealership "1" *-- "0..*" ServiceBay
+Dealership "1" *-- "0..*" Technician
+ServiceBay "0..*" --> "1" BayType
+Technician "0..*" -- "1..*" Skill : has >
+Technician "0..1" -- "0..1" User : login >
+User "0..*" --> "0..1" Dealership : staff of >
+User "1" *-- "0..*" Session
+User "1" *-- "0..*" Vehicle : owns >
+ServicePackage "0..*" --> "1" Skill : requires >
+ServicePackage "0..*" --> "1" BayType : needs >
+
+ConsultationRequest "0..*" --> "1" User : customer
+ConsultationRequest "0..*" --> "1" Vehicle
+ConsultationRequest "0..*" --> "1" Dealership
+ConsultationRequest "0..*" --> "0..1" User : advisor
+
+Appointment "0..*" --> "1" Dealership
+Appointment "0..*" --> "1" User : customer
+Appointment "0..*" --> "1" Vehicle
+Appointment "0..*" --> "1" ServiceBay
+Appointment "0..*" --> "1" Technician
+Appointment "0..*" --> "0..1" ServicePackage
+Appointment "0..1" --> "0..1" ConsultationRequest : live booking of
+Appointment "1" *-- "1..*" AppointmentEvent
+AppointmentEvent "0..*" --> "1" User : actor
+
+note bottom of Appointment
+  Invariants enforced by PostgreSQL:
+  • no two CONFIRMED / IN_PROGRESS appointments overlap on the
+    same bay, the same technician or the same vehicle (EXCLUDE gist)
+  • exactly one of servicePackage / consultationRequest
+  • bay and technician belong to the appointment's dealership
+  • at most one live appointment per consultation request
+end note
+
+note bottom of User
+  SERVICE_ADVISOR, TECHNICIAN, ADMIN → exactly one dealership
+  CUSTOMER, SYSTEM_MANAGER → none
+end note
+
+note right of ConsultationRequest
+  APPROVED and BOOKED require
+  durationMinutes, required skill
+  and bay type (CHECK constraint)
+end note
+@enduml

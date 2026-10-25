@@ -1,0 +1,541 @@
+openapi: 3.1.0
+info:
+  title: Unified Service Scheduler API
+  version: 0.1.0
+  description: |
+    Book vehicle service appointments with real-time availability of **both** a service bay
+    and a qualified technician for the whole job.
+
+    **Authentication**: `POST /api/auth/login` returns a bearer token. Send it as
+    `Authorization: Bearer <token>`. `POST /api/auth/logout` revokes it on the server.
+
+    **Errors** always have the shape `{ "error": { "code", "message", "details?", "requestId" } }`.
+    Quote the `requestId` (also in the `X-Request-Id` response header) when reporting a problem;
+    every log line for that request carries the same ID.
+
+    **Times** are ISO-8601 with offset and are interpreted in the dealership's time zone.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Auth
+  - name: Catalogue
+  - name: Customer
+  - name: Booking
+  - name: Consultations
+  - name: Staff
+  - name: Admin
+  - name: System
+  - name: Operations
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Date:
+      name: date
+      in: query
+      required: true
+      description: Local date at the dealership (YYYY-MM-DD)
+      schema: { type: string, format: date }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code: { type: string, example: SLOT_UNAVAILABLE }
+            message: { type: string }
+            details: {}
+            requestId: { type: string }
+    Role:
+      type: string
+      enum: [CUSTOMER, SERVICE_ADVISOR, TECHNICIAN, ADMIN, SYSTEM_MANAGER]
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        fullName: { type: string }
+        phone: { type: [string, 'null'] }
+        role: { $ref: '#/components/schemas/Role' }
+        dealershipId: { type: [string, 'null'], format: uuid }
+        dealershipName: { type: [string, 'null'] }
+    Session:
+      type: object
+      properties:
+        token: { type: string }
+        expiresAt: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/User' }
+    Dealership:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        address: { type: string }
+        phone: { type: [string, 'null'] }
+        timezone: { type: string, example: Asia/Ho_Chi_Minh }
+        openingTime: { type: string, example: '08:00' }
+        closingTime: { type: string, example: '17:30' }
+        openDays: { type: array, items: { type: integer, minimum: 1, maximum: 7 }, description: '1 = Monday' }
+        slotMinutes: { type: integer }
+        minLeadMinutes: { type: integer }
+        maxDaysAhead: { type: integer }
+    ServicePackage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        vehicleType: { type: string, enum: [MOTORBIKE, CAR] }
+        durationMinutes: { type: integer }
+        requiredSkill: { type: string }
+        bayType: { type: string }
+        price: { type: object, properties: { amount: { type: integer }, currency: { type: string } } }
+        checklist: { type: array, items: { type: string } }
+        isRecommended: { type: boolean }
+    Vehicle:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        vehicleType: { type: string, enum: [MOTORBIKE, CAR] }
+        make: { type: string }
+        model: { type: string }
+        year: { type: [integer, 'null'] }
+        plate: { type: string }
+        vin: { type: [string, 'null'] }
+        mileageKm: { type: [integer, 'null'] }
+    NewVehicle:
+      type: object
+      required: [vehicleType, make, model, plate]
+      properties:
+        vehicleType: { type: string, enum: [MOTORBIKE, CAR] }
+        make: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        plate: { type: string }
+        vin: { type: string, description: '17 characters, no I/O/Q' }
+        mileageKm: { type: integer }
+    Slot:
+      type: object
+      properties:
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        available: { type: boolean }
+        capacity: { type: integer, description: How many more jobs of this kind fit at this time }
+        reason: { type: string, enum: [PAST_OR_TOO_SOON, FULLY_BOOKED] }
+    Availability:
+      type: object
+      properties:
+        dealershipId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        timezone: { type: string }
+        durationMinutes: { type: integer }
+        offeredHere: { type: boolean, description: False when this dealership cannot do this job at all }
+        bookableDates: { type: array, items: { type: string, format: date } }
+        slots: { type: array, items: { $ref: '#/components/schemas/Slot' } }
+    BookRequest:
+      type: object
+      required: [dealershipId, vehicleId, start]
+      description: Give exactly one of packageId or consultationRequestId.
+      properties:
+        dealershipId: { type: string, format: uuid }
+        vehicleId: { type: string, format: uuid }
+        start: { type: string, format: date-time, example: '2026-10-27T09:00:00+07:00' }
+        packageId: { type: string, format: uuid }
+        consultationRequestId: { type: string, format: uuid }
+        customerNote: { type: string, maxLength: 1000 }
+    AppointmentStatus:
+      type: string
+      enum: [CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW]
+    Appointment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string, example: SV-7K3Q9M }
+        status: { $ref: '#/components/schemas/AppointmentStatus' }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        dealership: { type: object }
+        vehicle: { type: object }
+        customer: { type: object }
+        service:
+          type: object
+          properties:
+            kind: { type: string, enum: [PACKAGE, INSPECTION, MODIFICATION] }
+            name: { type: string }
+            packageId: { type: [string, 'null'] }
+            consultationRequestId: { type: [string, 'null'] }
+            checklist: { type: array, items: { type: string } }
+        price: { type: [object, 'null'] }
+        bay: { type: object, properties: { id: { type: string }, name: { type: string } } }
+        technician: { type: object, properties: { id: { type: string }, name: { type: string } } }
+        customerNote: { type: [string, 'null'] }
+        cancelReason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+    Consultation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string }
+        kind: { type: string, enum: [INSPECTION, MODIFICATION] }
+        status: { type: string, enum: [SUBMITTED, APPROVED, REJECTED, BOOKED, CANCELLED] }
+        areas: { type: array, items: { type: string } }
+        description: { type: string }
+        vehicle: { type: object }
+        dealership: { type: object }
+        customer: { type: object }
+        advisorNote: { type: [string, 'null'] }
+        durationMinutes: { type: [integer, 'null'] }
+        requiredSkill: { type: [string, 'null'] }
+        bayType: { type: [string, 'null'] }
+        estimatedPrice: { type: [integer, 'null'] }
+        appointment: { type: [object, 'null'] }
+
+security:
+  - bearer: []
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Create a customer account and sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, description: Must contain a letter and a digit }
+                fullName: { type: string }
+                phone: { type: string }
+      responses:
+        '201': { description: Signed in, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties: { email: { type: string }, password: { type: string } }
+      responses:
+        '200': { description: Signed in, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Sign out (revokes the token server-side)
+      responses:
+        '204': { description: Signed out }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: The signed-in user
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+
+  /api/dealerships:
+    get:
+      tags: [Catalogue]
+      summary: Dealerships you can book with
+      security: []
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Dealership' } } } } }
+  /api/service-packages:
+    get:
+      tags: [Catalogue]
+      summary: Maintenance packages (the main "book a service" feature)
+      security: []
+      parameters:
+        - { name: vehicleType, in: query, schema: { type: string, enum: [MOTORBIKE, CAR] } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ServicePackage' } } } } }
+  /api/reference-data:
+    get:
+      tags: [Catalogue]
+      summary: Inspection areas, skills and bay types
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /api/me/vehicles:
+    get:
+      tags: [Customer]
+      summary: My vehicles
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Vehicle' } } } } }
+    post:
+      tags: [Customer]
+      summary: Add a vehicle
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NewVehicle' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Vehicle' } } } }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /api/availability:
+    get:
+      tags: [Booking]
+      summary: Free start times for a job on one day
+      description: A start time is available only if a bay of the right type AND a technician with the right skill, on shift, are both free for the whole duration.
+      parameters:
+        - { name: dealershipId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Date' }
+        - { name: packageId, in: query, schema: { type: string, format: uuid } }
+        - { name: consultationRequestId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Availability' } } } }
+  /api/appointments:
+    post:
+      tags: [Booking]
+      summary: Book an appointment
+      description: |
+        The server picks the bay and technician. Double booking is impossible: the database rejects
+        overlapping bookings of the same bay, technician or vehicle, and the server retries with the
+        next free pair when it loses a race.
+
+        Send an `Idempotency-Key` header to make retries safe: repeating a request with the same key
+        returns the original appointment (200, header `Idempotent-Replayed: true`) instead of booking twice.
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, minLength: 8, maxLength: 100 } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookRequest' } } } }
+      responses:
+        '201': { description: Booked, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '200': { description: Replay of an earlier request with the same Idempotency-Key }
+        '409':
+          description: SLOT_UNAVAILABLE (details.alternatives holds the nearest free slots), VEHICLE_ALREADY_BOOKED or CONSULTATION_NOT_BOOKABLE
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '422': { description: 'Start time breaks a workshop rule (TOO_SOON, OUTSIDE_OPENING_HOURS, …), the package does not fit the vehicle, or NOT_OFFERED_HERE (no bay or technician for this job at the dealership)' }
+  /api/me/appointments:
+    get:
+      tags: [Booking]
+      summary: My appointments
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Appointment' } } } } }
+  /api/appointments/{id}:
+    get:
+      tags: [Booking]
+      summary: One appointment (customers see their own; staff see their dealership's)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/appointments/{id}/cancel:
+    post:
+      tags: [Booking]
+      summary: Cancel (customer before the start time; advisor/admin any time before work starts)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { reason: { type: string } } } } } }
+      responses:
+        '200': { description: Cancelled, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/appointments/{id}/status:
+    post:
+      tags: [Staff]
+      summary: Move an appointment through its lifecycle (start, complete, no-show)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW] }
+                reason: { type: string }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /api/consultations:
+    post:
+      tags: [Consultations]
+      summary: Ask for an inspection or a customisation; an advisor reviews it before you pick a time
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, vehicleId, dealershipId, areas, description]
+              properties:
+                kind: { type: string, enum: [INSPECTION, MODIFICATION] }
+                vehicleId: { type: string, format: uuid }
+                dealershipId: { type: string, format: uuid }
+                areas: { type: array, items: { type: string } }
+                description: { type: string, minLength: 10 }
+      responses:
+        '201': { description: Submitted, content: { application/json: { schema: { $ref: '#/components/schemas/Consultation' } } } }
+  /api/me/consultations:
+    get:
+      tags: [Consultations]
+      summary: My consultation requests
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Consultation' } } } } }
+  /api/consultations/{id}:
+    get:
+      tags: [Consultations]
+      summary: One consultation request
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Consultation' } } } }
+  /api/consultations/{id}/cancel:
+    post:
+      tags: [Consultations]
+      summary: Withdraw a submitted or approved request
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Cancelled }
+  /api/consultations/{id}/review:
+    post:
+      tags: [Consultations]
+      summary: Advisor approves (with duration, skill, bay type, estimate) or rejects a request
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [decision, durationMinutes, requiredSkill, bayType]
+                  properties:
+                    decision: { const: APPROVE }
+                    durationMinutes: { type: integer, multipleOf: 15 }
+                    requiredSkill: { type: string }
+                    bayType: { type: string }
+                    estimatedPrice: { type: integer }
+                    note: { type: string }
+                - type: object
+                  required: [decision, note]
+                  properties:
+                    decision: { const: REJECT }
+                    note: { type: string }
+      responses:
+        '200': { description: Reviewed, content: { application/json: { schema: { $ref: '#/components/schemas/Consultation' } } } }
+  /api/staff/consultations:
+    get:
+      tags: [Staff]
+      summary: Consultation queue for my dealership
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [SUBMITTED, APPROVED, REJECTED, BOOKED, CANCELLED] } }
+      responses:
+        '200': { description: OK }
+  /api/staff/appointments:
+    get:
+      tags: [Staff]
+      summary: My dealership's appointments for a day
+      parameters: [{ $ref: '#/components/parameters/Date' }]
+      responses:
+        '200': { description: OK }
+  /api/staff/resources:
+    get:
+      tags: [Staff]
+      summary: Active bays and technicians of my dealership (for the day board)
+      responses:
+        '200': { description: OK }
+  /api/technician/jobs:
+    get:
+      tags: [Staff]
+      summary: Jobs assigned to me (technician) for a day
+      parameters: [{ $ref: '#/components/parameters/Date' }]
+      responses:
+        '200': { description: OK }
+
+  /api/admin/bays:
+    get: { tags: [Admin], summary: Service bays of my dealership, responses: { '200': { description: OK } } }
+    post:
+      tags: [Admin]
+      summary: Add a bay
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name, bayType], properties: { name: { type: string }, bayType: { type: string } } } } } }
+      responses: { '201': { description: Created } }
+  /api/admin/bays/{id}:
+    patch:
+      tags: [Admin]
+      summary: Activate / deactivate a bay
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { isActive: { type: boolean } } } } } }
+      responses: { '200': { description: OK } }
+  /api/admin/technicians:
+    get: { tags: [Admin], summary: Technicians with skills and shifts, responses: { '200': { description: OK } } }
+    post:
+      tags: [Admin]
+      summary: Add a technician (optionally with a login)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName, skills, shiftStart, shiftEnd, workDays]
+              properties:
+                displayName: { type: string }
+                skills: { type: array, items: { type: string } }
+                shiftStart: { type: string, example: '08:00' }
+                shiftEnd: { type: string, example: '17:00' }
+                workDays: { type: array, items: { type: integer } }
+                login: { type: object, properties: { email: { type: string }, password: { type: string } } }
+      responses: { '201': { description: Created } }
+  /api/admin/technicians/{id}:
+    patch:
+      tags: [Admin]
+      summary: Activate / deactivate a technician
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { isActive: { type: boolean } } } } } }
+      responses: { '200': { description: OK } }
+  /api/admin/staff:
+    get: { tags: [Admin], summary: Staff accounts of my dealership, responses: { '200': { description: OK } } }
+    post:
+      tags: [Admin]
+      summary: Create a service advisor or admin account
+      responses: { '201': { description: Created } }
+
+  /api/system/dealerships:
+    get: { tags: [System], summary: All dealerships with capacity figures, responses: { '200': { description: OK } } }
+    post:
+      tags: [System]
+      summary: Onboard a dealership together with its first admin
+      responses: { '201': { description: Created } }
+
+  /health:
+    get:
+      tags: [Operations]
+      summary: Liveness and database check
+      security: []
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Database unreachable }
+  /metrics:
+    get:
+      tags: [Operations]
+      summary: Prometheus metrics (HTTP latency, bookings, conflicts, retries…)
+      security: []
+      responses:
+        '200': { description: Prometheus text format }

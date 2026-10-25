@@ -1,0 +1,16 @@
+# Optional: run against a regular PostgreSQL instead of the embedded one.
+#   docker compose up -d
+#   DATABASE_URL=postgres://scheduler:scheduler@localhost:5432/scheduler npm run dev
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: scheduler
+      POSTGRES_PASSWORD: scheduler
+      POSTGRES_DB: scheduler
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U scheduler']
+      interval: 5s
+      retries: 10

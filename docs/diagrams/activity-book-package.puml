@@ -1,0 +1,84 @@
+@startuml activity-book-package
+!include _style.iuml
+title Activity — customer books a maintenance package (UC04, with UC20, UC21, UC22)
+
+|Customer|
+|Web app|
+|API|
+|PostgreSQL|
+|Customer|
+start
+if (Has a vehicle?) then (no)
+  :Add a vehicle;
+else (yes)
+endif
+:Choose the vehicle;
+:Choose a package
+(only packages for this vehicle type);
+repeat :Choose a dealership;
+  |API|
+  :Check the dealership has a bay of the
+  package's type and a technician with its skill;
+repeat while (Can this dealership do the job?) is (no: "cannot do this job here")
+-> yes;
+:Compute the day's start times: a free bay
+AND a qualified technician on shift for the
+whole job, inside opening hours, after lead time;
+|Web app|
+:Open the first day that still has a free time,
+refresh availability every 30 s;
+repeat
+  |Customer|
+  :Pick a start time;
+  :Review, add a note, press **Confirm booking**;
+  |Web app|
+  :Send with an Idempotency-Key
+  (new key per distinct attempt);
+  |API|
+  if (Same key already booked?) then (yes)
+    :Return the original appointment
+    (200, Idempotent-Replayed);
+  else (no)
+    if (Start time valid? open day, on the grid,
+inside hours, ≥ lead time, ≤ max days ahead) then (no)
+      :422 with the reason;
+    else (yes)
+      repeat
+        :Transaction: read free bays and technicians,
+        allocate best fit (fewest skills, least loaded);
+        if (A free pair?) then (no)
+          break
+        endif
+        |PostgreSQL|
+        :INSERT appointment;
+        :EXCLUDE constraints reject any overlap
+        of bay, technician or vehicle;
+        note right
+          Vehicle overlap → 409 VEHICLE_ALREADY_BOOKED
+          (no retry: the customer must pick another time)
+        end note
+        |API|
+      repeat while (Lost the race on the bay or technician,
+and fewer than 5 attempts?) is (yes: retry with fresh data)
+      -> no;
+      if (Inserted?) then (yes)
+        :Commit, record CONFIRMED in the audit trail,
+        log booking.created, count the metric;
+      else (no)
+        :409 SLOT_UNAVAILABLE with the 3 nearest
+        free times, log booking.slot_unavailable;
+        |Web app|
+        :Show "taken a moment ago" and
+        the alternatives as buttons;
+      endif
+    endif
+  endif
+  |Customer|
+repeat while (Booked?) is (no: pick another time\nor one of the alternatives)
+-> yes;
+|Web app|
+:Show the reference, technician and ticket;
+|Customer|
+:Optionally add to calendar (.ics);
+stop
+@enduml

@@ -1,0 +1,56 @@
+# HTTP routes. Paths match the TypeScript backend and conf/openapi.yaml exactly.
+
+# ---- identity --------------------------------------------------------------------------------
+POST    /api/auth/register                 scheduler.modules.identity.adapters.IdentityController.register
+POST    /api/auth/login                    scheduler.modules.identity.adapters.IdentityController.login
+POST    /api/auth/logout                   scheduler.modules.identity.adapters.IdentityController.logout
+GET     /api/auth/me                       scheduler.modules.identity.adapters.IdentityController.me
+
+# ---- catalogue (public) ----------------------------------------------------------------------
+GET     /api/dealerships                   scheduler.modules.catalog.adapters.CatalogController.dealerships
+GET     /api/service-packages              scheduler.modules.catalog.adapters.CatalogController.packages
+GET     /api/reference-data                scheduler.modules.catalog.adapters.CatalogController.referenceData
+
+# ---- customer vehicles -----------------------------------------------------------------------
+GET     /api/me/vehicles                   scheduler.modules.vehicles.adapters.VehicleController.listMine
+POST    /api/me/vehicles                   scheduler.modules.vehicles.adapters.VehicleController.add
+
+# ---- scheduling ------------------------------------------------------------------------------
+GET     /api/availability                  scheduler.modules.scheduling.adapters.SchedulingController.availabilityForDay
+POST    /api/appointments                  scheduler.modules.scheduling.adapters.SchedulingController.book
+GET     /api/me/appointments               scheduler.modules.scheduling.adapters.SchedulingController.listMine
+GET     /api/appointments/:id              scheduler.modules.scheduling.adapters.SchedulingController.get(id: String)
+POST    /api/appointments/:id/cancel       scheduler.modules.scheduling.adapters.SchedulingController.cancel(id: String)
+POST    /api/appointments/:id/status       scheduler.modules.scheduling.adapters.SchedulingController.changeStatus(id: String)
+GET     /api/staff/appointments            scheduler.modules.scheduling.adapters.SchedulingController.dealershipDay
+GET     /api/technician/jobs               scheduler.modules.scheduling.adapters.SchedulingController.technicianDay
+
+# ---- consultations (inspection / modification requests) --------------------------------------
+POST    /api/consultations                 scheduler.modules.consultation.adapters.ConsultationController.submit
+GET     /api/me/consultations              scheduler.modules.consultation.adapters.ConsultationController.listMine
+GET     /api/consultations/:id             scheduler.modules.consultation.adapters.ConsultationController.get(id: String)
+POST    /api/consultations/:id/cancel      scheduler.modules.consultation.adapters.ConsultationController.cancel(id: String)
+GET     /api/staff/consultations           scheduler.modules.consultation.adapters.ConsultationController.listForDealership
+POST    /api/consultations/:id/review      scheduler.modules.consultation.adapters.ConsultationController.review(id: String)
+
+# ---- dealership administration ---------------------------------------------------------------
+GET     /api/admin/bays                    scheduler.modules.admin.adapters.AdminController.listBays
+POST    /api/admin/bays                    scheduler.modules.admin.adapters.AdminController.addBay
+PATCH   /api/admin/bays/:id                scheduler.modules.admin.adapters.AdminController.setBayActive(id: String)
+GET     /api/admin/technicians             scheduler.modules.admin.adapters.AdminController.listTechnicians
+POST    /api/admin/technicians             scheduler.modules.admin.adapters.AdminController.addTechnician
+PATCH   /api/admin/technicians/:id         scheduler.modules.admin.adapters.AdminController.setTechnicianActive(id: String)
+GET     /api/staff/resources               scheduler.modules.admin.adapters.AdminController.activeResources
+GET     /api/admin/staff                   scheduler.modules.admin.adapters.AdminController.listStaff
+POST    /api/admin/staff                   scheduler.modules.admin.adapters.AdminController.addStaff
+
+# ---- platform administration -----------------------------------------------------------------
+GET     /api/system/dealerships            scheduler.modules.system.adapters.SystemController.list
+POST    /api/system/dealerships            scheduler.modules.system.adapters.SystemController.onboard
+
+# ---- operations ------------------------------------------------------------------------------
+GET     /health                            scheduler.http.OpsController.health
+GET     /metrics                           scheduler.http.OpsController.metrics
+GET     /docs                              scheduler.http.OpsController.docs
+GET     /docs/openapi.yaml                 scheduler.http.OpsController.openapi
+GET     /docs/*file                        scheduler.http.OpsController.swaggerAsset(file: String)

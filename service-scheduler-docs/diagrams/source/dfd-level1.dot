@@ -1,0 +1,94 @@
+// Data flow diagram, level 1. Render: dot -Tpng -Gdpi=150 dfd-level1.dot -o dfd-level1.png
+// Processes = numbered circles, data stores = open boxes (D1..D8), external entities = grey boxes.
+digraph level1 {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=20, labelloc=t, nodesep=0.35, ranksep=1.3, pad=0.4, newrank=true,
+         label="Data flow diagram, level 1: inside the Unified Service Scheduler\n\n"];
+  node  [fontname="Helvetica", fontsize=12, color="#1F2A30", penwidth=1.3];
+  edge  [fontname="Helvetica", fontsize=10, color="#56636B", fontcolor="#1F2A30", arrowsize=0.7];
+
+  // External entities
+  node [shape=box, style=filled, fillcolor="#F3F5F4", width=1.6, height=0.6];
+  customer   [label="Customer"];
+  advisor    [label="Service advisor"];
+  technician [label="Technician"];
+  admin      [label="Dealership admin\n/ system manager"];
+  monitor    [label="Monitoring platform", style="filled,dashed"];
+
+  // Processes
+  node [shape=circle, style=filled, fillcolor="#1D4E89", fontcolor=white, width=1.55, fixedsize=true, fontsize=11];
+  p1 [label="1\nAuthenticate\n& authorise"];
+  p2 [label="2\nMaintain\nresources"];
+  p3 [label="3\nCompute\navailability"];
+  p4 [label="4\nBook\nappointment"];
+  p5 [label="5\nHandle advice\nrequest"];
+  p6 [label="6\nManage\nlifecycle"];
+  p7 [label="7\nObserve", fillcolor="#56636B"];
+
+  // Data stores (open-ended boxes)
+  node [shape=record, style=filled, fillcolor="#FFF7D6", fontcolor="#1F2A30", fixedsize=false, width=2.2, height=0.45, fontsize=11];
+  d1 [label="{D1 | users, sessions}"];
+  d2 [label="{D2 | dealerships, bays,\ntechnicians, skills}"];
+  d3 [label="{D3 | service packages}"];
+  d4 [label="{D4 | vehicles}"];
+  d5 [label="{D5 | consultation requests}"];
+  d6 [label="{D6 | appointments\n(EXCLUDE: bay, technician, vehicle)}"];
+  d7 [label="{D7 | appointment events (audit)}"];
+  d8 [label="{D8 | logs, metrics}"];
+
+  { rank=same; customer; advisor; technician; admin; }
+  { rank=same; p1; p2; p5; }
+  { rank=same; p3; p6; }
+  { rank=same; d1; d2; d3; d4; }
+
+  // 1 Authenticate
+  customer -> p1 [label="email, password"];
+  p1 -> customer [label="token"];
+  p1 -> d1 [label="session hash"];
+  d1 -> p1 [label="user, role,\ndealership"];
+
+  // 2 Resources
+  admin -> p2 [label="bays, technicians,\nstaff, dealership"];
+  p2 -> d2 [label="resource rows"];
+  p2 -> d1 [label="staff accounts"];
+
+  // 3 Availability
+  customer -> p3 [label="vehicle, package or request,\ndealership, date"];
+  d2 -> p3 [label="hours, bays, shifts, skills"];
+  d3 -> p3 [label="duration, skill, bay type"];
+  d6 -> p3 [label="busy periods"];
+  p3 -> customer [label="slots with capacity"];
+
+  // 4 Booking
+  customer -> p4 [label="start, Idempotency-Key"];
+  d4 -> p4 [label="owned vehicle"];
+  p3 -> p4 [label="free (bay, technician)\npairs, best fit"];
+  p4 -> d6 [label="new appointment\n(row lock + EXCLUDE)"];
+  p4 -> d5 [label="mark BOOKED"];
+  p4 -> customer [label="confirmation or\n409 + alternatives"];
+  customer -> p4 [label="new vehicle details"];
+  p4 -> d4 [label="vehicle"];
+
+  // 5 Advice requests
+  customer -> p5 [label="areas, description"];
+  p5 -> d5 [label="request, decision"];
+  d5 -> p5 [label="queue"];
+  p5 -> advisor [label="waiting requests"];
+  advisor -> p5 [label="duration, skill,\nbay type, estimate"];
+  d5 -> p3 [label="approved job\nrequirement"];
+
+  // 6 Lifecycle
+  advisor -> p6 [label="start, done,\nno-show, cancel"];
+  technician -> p6 [label="start, finish"];
+  customer -> p6 [label="cancel"];
+  d6 -> p6 [label="day board, jobs"];
+  p6 -> d6 [label="new status"];
+  p6 -> d7 [label="who, when, from, to"];
+  p6 -> d5 [label="re-open on cancel"];
+  p6 -> advisor [label="day board"];
+  p6 -> technician [label="my jobs"];
+
+  // 7 Observe (every process emits)
+  { p1 p3 p4 p5 p6 } -> p7 [style=dotted, arrowhead=none, color="#9AA5AB"];
+  p7 -> d8 [label="JSON logs, counters,\nlatency histograms"];
+  d8 -> monitor [label="/metrics, log shipping", style=dashed];
+}

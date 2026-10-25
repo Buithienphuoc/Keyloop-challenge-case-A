@@ -1,0 +1,52 @@
+@startuml activity-workshop-day
+!include _style.iuml
+title Activity — the workshop day (UC30, UC32, UC33, UC40, UC41)
+
+|Service advisor|
+|Technician|
+|System|
+|Service advisor|
+start
+:Open the workshop day board
+(bays as rows, jobs placed by time);
+:Select a booking;
+if (Has the vehicle arrived?) then (yes)
+  :Hand the vehicle to the
+  assigned technician;
+  |Technician|
+  :Open "My jobs", read the service,
+  the checklist and the customer's note;
+  :Start job;
+  note right: The advisor can also start it from the board.
+  |System|
+  :CONFIRMED → **IN_PROGRESS**;
+  |Technician|
+  :Do the work;
+  :Job done;
+  |System|
+  :IN_PROGRESS → **COMPLETED**;
+else (no)
+  |Service advisor|
+  if (Start time passed and\nthe customer did not come?) then (yes)
+    :Mark no-show;
+    |System|
+    :CONFIRMED → **NO_SHOW**
+    (bay and technician freed);
+  else (no: the booking must be dropped)
+    |Service advisor|
+    :Cancel the booking (before work starts);
+    |System|
+    :CONFIRMED → **CANCELLED**
+    (slot freed, a linked request re-opens);
+  endif
+endif
+|System|
+:Write the audit row (appointment_events),
+log appointment.status_changed, count the metric;
+note right
+  Any other move (e.g. COMPLETED → IN_PROGRESS)
+  → 409; a technician acting on someone else's
+  job → 403. Nothing changes.
+end note
+stop
+@enduml

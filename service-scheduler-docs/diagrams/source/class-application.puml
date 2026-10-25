@@ -1,0 +1,150 @@
+@startuml class-application
+!include _style.iuml
+title Application layer (backend/app/scheduler) — services depend on ports; adapters implement them
+skinparam ClassBorderColor #1D4E89
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassHeaderBackgroundColor #E6EEF7
+skinparam ClassAttributeIconSize 0
+hide empty members
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+
+package "scheduling.application" <<Rectangle>> {
+  class AvailabilityService {
+    + forDay(auth, query) : AvailabilityResponse
+    + nearest(rules, requirement, dealershipId, requested) : Seq[Slot]
+  }
+  class BookingService {
+    + book(auth, request, idempotencyKey, log) : BookingResult
+    - replay(auth, key, log)
+  }
+  class AppointmentService {
+    + get(auth, id) : AppointmentView
+    + listMine(auth) / listForDealershipDay / listTechnicianDay
+    + changeStatus(auth, id, to, reason, log) : AppointmentView
+  }
+  class WorkshopContext {
+    + dealership(id) : Dealership
+    + requirementFor(s, auth, dealershipId, source, vehicle?) : Requirement
+  }
+  interface ResourceCalendar <<port>> {
+    + activeResources(s, dealershipId)
+    + busyPeriods(s, dealershipId, from, to)
+  }
+  interface AppointmentReader <<port>> {
+    + get(s, id) / list(s, filter)
+    + technicianIdForUser(s, userId)
+  }
+  interface AppointmentWriter <<port>> {
+    + insert(s, appt) : id  «throws SlotTakenError, VehicleBusyError»
+    + lockIdempotencyKey / findIdByIdempotencyKey
+    + lockForUpdate / setStatus / recordEvent
+  }
+  interface ConsultationBookingPort <<port>> {
+    + forBooking(s, id) / markBooked(s, id) / reopen(s, id)
+  }
+}
+
+package "consultation" <<Rectangle>> {
+  class ConsultationService {
+    + submit / getVisible / listMine / listForDealership
+    + review(auth, id, decision, log) / cancel
+  }
+  interface ConsultationRepository <<port>>
+}
+
+package "vehicles" <<Rectangle>> {
+  class VehicleService {
+    + listMine / add
+    + getOwned(ownerId, vehicleId) : Vehicle
+  }
+  interface OwnedVehicles <<port>> {
+    + getOwned(ownerId, vehicleId) : Vehicle
+  }
+  interface VehicleRepository <<port>>
+}
+
+package "catalog" <<Rectangle>> {
+  interface CatalogReader <<port>> {
+    + getDealership / getPackage / hasSkill / list…
+  }
+}
+
+package "identity" <<Rectangle>> {
+  class IdentityService {
+    + createUser(input, s?) / registerCustomer / login / logout
+    + authenticate(token) : Option[AuthContext]
+  }
+  interface Authenticator <<port>> {
+    + authenticate(token) : Option[AuthContext]
+  }
+  interface UserRepository <<port>>
+  interface SessionRepository <<port>>
+}
+
+package "admin · system" <<Rectangle>> {
+  class WorkshopAdminService
+  class TenantService
+  interface WorkshopRepository <<port>>
+  interface TenantRepository <<port>>
+}
+
+package "shared" <<Rectangle>> {
+  interface Db <<port>> {
+    + run(f: DbSession => T) : T
+    + tx(f: DbSession => T) : T «deadlock → TransientStorageError»
+  }
+}
+
+package "adapters (PostgreSQL)" <<Rectangle>> {
+  class PgSchedulingStore
+  class PgConsultationRepo
+  class PgVehicleRepo
+  class PgCatalogRepo
+  class PgIdentityRepo
+  class "PgWorkshopRepo · PgTenantRepo" as PgAdmin
+}
+
+AvailabilityService --> ResourceCalendar
+AvailabilityService --> WorkshopContext
+BookingService --> ResourceCalendar
+BookingService --> AppointmentReader
+BookingService --> AppointmentWriter
+BookingService --> ConsultationBookingPort
+BookingService --> OwnedVehicles
+BookingService --> WorkshopContext
+BookingService --> AvailabilityService : nearest()
+AppointmentService --> AppointmentReader
+AppointmentService --> AppointmentWriter
+AppointmentService --> ConsultationBookingPort : reopen
+WorkshopContext --> CatalogReader
+WorkshopContext --> ConsultationBookingPort
+
+ConsultationService ..|> ConsultationBookingPort
+ConsultationService --> ConsultationRepository
+ConsultationService --> OwnedVehicles
+ConsultationService --> CatalogReader
+VehicleService ..|> OwnedVehicles
+VehicleService --> VehicleRepository
+IdentityService ..|> Authenticator
+IdentityService --> UserRepository
+IdentityService --> SessionRepository
+WorkshopAdminService --> WorkshopRepository
+WorkshopAdminService --> IdentityService : createUser in tx
+TenantService --> TenantRepository
+TenantService --> IdentityService : first admin in tx
+
+PgSchedulingStore ..|> ResourceCalendar
+PgSchedulingStore ..|> AppointmentReader
+PgSchedulingStore ..|> AppointmentWriter
+PgConsultationRepo ..|> ConsultationRepository
+PgVehicleRepo ..|> VehicleRepository
+PgCatalogRepo ..|> CatalogReader
+PgIdentityRepo ..|> UserRepository
+PgIdentityRepo ..|> SessionRepository
+PgAdmin ..|> WorkshopRepository
+PgAdmin ..|> TenantRepository
+
+note "Wiring lives in AppComponents (AppLoader.scala) only.\nServices that write in a transaction also receive Db.\nHTTP controllers (not shown) call the services; the guard\nsees only Authenticator." as N1
+@enduml

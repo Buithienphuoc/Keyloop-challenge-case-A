@@ -1,0 +1,22 @@
+' Shared look for every diagram.
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam ArrowColor #4A5961
+skinparam ActorBorderColor #1F2A30
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #1D4E89
+skinparam UsecaseBackgroundColor #E6EEF7
+skinparam RectangleBorderColor #1F2A30
+skinparam RectangleBackgroundColor #FAFBFA
+skinparam ActivityBorderColor #1D4E89
+skinparam ActivityBackgroundColor #E6EEF7
+skinparam ActivityDiamondBorderColor #1F2A30
+skinparam ActivityDiamondBackgroundColor #FDF4D2
+skinparam SwimlaneBorderColor #B5BFBB
+skinparam SwimlaneTitleFontStyle bold
+skinparam StateBorderColor #1D4E89
+skinparam StateBackgroundColor #E6EEF7
+skinparam NoteBackgroundColor #FFFFFF
+skinparam NoteBorderColor #B5BFBB

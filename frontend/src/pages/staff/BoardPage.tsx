@@ -1,0 +1,241 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DateTime } from 'luxon';
+import { useState } from 'react';
+import { get, post } from '../../api/client';
+import { useDealerships } from '../../api/hooks';
+import type { Appointment, AppointmentStatus } from '../../api/types';
+import { useAuth } from '../../auth/AuthContext';
+import { DayNav } from '../../components/DayNav';
+import { Empty, ErrorNote, Loading, PageHead, Plate, StatusPill } from '../../components/ui';
+import { dt, money, time, todayIn, vehicleName } from '../../lib/format';
+
+interface Resources {
+  bays: { id: string; name: string; bayType: string; bayTypeName: string }[];
+  technicians: { id: string; displayName: string; skills: string[] }[];
+}
+
+const minutes = (hhmm: string) => {
+  const [h = 0, m = 0] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+
+/**
+ * The advisor's view of one workshop day: every bay as a row, every job as a block
+ * positioned by its time. Clicking a job opens it on the right with the actions that
+ * are allowed for its current status.
+ */
+export function BoardPage() {
+  const { user } = useAuth();
+  const dealerships = useDealerships();
+  const dealership = dealerships.data?.find((d) => d.id === user?.dealershipId);
+  const zone = dealership?.timezone ?? 'Asia/Ho_Chi_Minh';
+  const [date, setDate] = useState(todayIn(zone));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const resources = useQuery({ queryKey: ['staff', 'resources'], queryFn: () => get<Resources>('/api/staff/resources') });
+  const appointments = useQuery({
+    queryKey: ['staff', 'appointments', date],
+    queryFn: () => get<Appointment[]>(`/api/staff/appointments?date=${date}`),
+    refetchInterval: 30_000,
+  });
+
+  if (!dealership || resources.isLoading) return <Loading />;
+
+  const open = minutes(dealership.openingTime);
+  const close = minutes(dealership.closingTime);
+  const span = close - open;
+  const pos = (iso: string) => {
+    const d = dt(iso).setZone(zone);
+    return ((d.hour * 60 + d.minute - open) / span) * 100;
+  };
+  const hours: number[] = [];
+  for (let h = Math.ceil(open / 60); h * 60 <= close; h++) hours.push(h);
+
+  const list = appointments.data ?? [];
+  const active = list.filter((a) => a.status !== 'CANCELLED');
+  const selected = list.find((a) => a.id === selectedId) ?? null;
+  const nowLocal = DateTime.now().setZone(zone);
+  const showNow = nowLocal.toISODate() === date && nowLocal.hour * 60 + nowLocal.minute > open && nowLocal.hour * 60 + nowLocal.minute < close;
+  const nowPos = (((nowLocal.hour * 60 + nowLocal.minute) - open) / span) * 100;
+
+  const counts = {
+    booked: active.length,
+    inProgress: active.filter((a) => a.status === 'IN_PROGRESS').length,
+    done: active.filter((a) => a.status === 'COMPLETED').length,
+  };
+
+  return (
+    <div className="page">
+      <PageHead title="Workshop day" actions={<DayNav date={date} zone={zone} onChange={(d) => { setDate(d); setSelectedId(null); }} />}>
+        {dealership.name} · {DateTime.fromISO(date, { zone }).toFormat('cccc d LLLL')} · {counts.booked} jobs, {counts.inProgress} in progress,{' '}
+        {counts.done} done
+      </PageHead>
+      <ErrorNote error={appointments.error ?? resources.error} />
+
+      <div className="split">
+        <div className="board" role="region" aria-label="Bays and jobs">
+          <div className="board-grid">
+            <div className="board-row board-hours" style={{ minHeight: 30 }}>
+              <div className="bay" />
+              <div className="ticks">
+                {hours.map((h) => (
+                  <span key={h} style={{ left: `${((h * 60 - open) / span) * 100}%` }}>
+                    {String(h).padStart(2, '0')}:00
+                  </span>
+                ))}
+              </div>
+            </div>
+            {resources.data?.bays.map((bay) => (
+              <div className="board-row" key={bay.id}>
+                <div className="bay">
+                  {bay.name}
+                  <span>{bay.bayTypeName}</span>
+                </div>
+                <div className="board-track">
+                  {hours.map((h) => (
+                    <div key={h} className="hourline" style={{ left: `${((h * 60 - open) / span) * 100}%` }} />
+                  ))}
+                  {showNow && <div className="now-line" style={{ left: `${nowPos}%` }} aria-label="Now" />}
+                  {active
+                    .filter((a) => a.bay.id === bay.id)
+                    .map((a) => (
+                      <button
+                        key={a.id}
+                        className={`job s-${a.status}${a.id === selectedId ? ' selected' : ''}`}
+                        style={{ left: `${pos(a.start)}%`, width: `${pos(a.end) - pos(a.start)}%` }}
+                        onClick={() => setSelectedId(a.id)}
+                        title={`${time(a.start)}–${time(a.end)} ${a.service.name}`}
+                      >
+                        <strong>{a.vehicle.plate}</strong>
+                        <span>
+                          {time(a.start)} {a.service.name}
+                        </span>
+                        <span>{a.technician.name}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <aside>
+          {selected ? (
+            <JobPanel a={selected} date={date} onClose={() => setSelectedId(null)} />
+          ) : (
+            <div className="panel panel-tight stack">
+              <h3>Jobs today</h3>
+              {list.length === 0 && <Empty title="Nothing booked">This day has no appointments yet.</Empty>}
+              {list.map((a) => (
+                <button key={a.id} className="choice" style={{ gridTemplateColumns: 'auto 1fr' }} onClick={() => setSelectedId(a.id)}>
+                  <span className="sign" style={{ fontSize: '1.125rem' }}>
+                    {time(a.start)}
+                  </span>
+                  <span>
+                    <span className="title">{a.service.name}</span>
+                    <span className="sub" style={{ display: 'block' }}>
+                      {a.vehicle.plate} · {a.bay.name} · {a.technician.name}
+                    </span>
+                    <StatusPill status={a.status} />
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function JobPanel({ a, date, onClose }: { a: Appointment; date: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const change = useMutation({
+    mutationFn: (status: AppointmentStatus) =>
+      status === 'CANCELLED'
+        ? post<Appointment>(`/api/appointments/${a.id}/cancel`, { reason: 'Cancelled by the dealership' })
+        : post<Appointment>(`/api/appointments/${a.id}/status`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff', 'appointments', date] }),
+  });
+  const started = Date.parse(a.start) <= Date.now();
+
+  return (
+    <div className="panel panel-tight stack">
+      <div className="spread">
+        <span className="sign" style={{ fontSize: '1.25rem' }}>
+          {a.reference}
+        </span>
+        <button className="btn btn-sm btn-ghost" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <div className="row">
+        <Plate text={a.vehicle.plate} />
+        <StatusPill status={a.status} />
+      </div>
+      <dl className="kv">
+        <dt>Time</dt>
+        <dd>
+          {time(a.start)}–{time(a.end)}
+        </dd>
+        <dt>Service</dt>
+        <dd>{a.service.name}</dd>
+        <dt>Vehicle</dt>
+        <dd>{vehicleName(a.vehicle)}</dd>
+        <dt>Customer</dt>
+        <dd>
+          {a.customer.fullName}
+          {a.customer.phone && (
+            <>
+              <br />
+              <a href={`tel:${a.customer.phone.replace(/\s/g, '')}`}>{a.customer.phone}</a>
+            </>
+          )}
+        </dd>
+        <dt>Bay</dt>
+        <dd>{a.bay.name}</dd>
+        <dt>Technician</dt>
+        <dd>{a.technician.name}</dd>
+        <dt>Price</dt>
+        <dd>{money(a.price)}</dd>
+        {a.customerNote && (
+          <>
+            <dt>Note</dt>
+            <dd>{a.customerNote}</dd>
+          </>
+        )}
+      </dl>
+      {a.service.checklist.length > 0 && (
+        <ul className="checklist" style={{ columns: 1 }}>
+          {a.service.checklist.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      )}
+      <ErrorNote error={change.error} />
+      <div className="row">
+        {a.status === 'CONFIRMED' && (
+          <button className="btn btn-primary btn-sm" disabled={change.isPending} onClick={() => change.mutate('IN_PROGRESS')}>
+            Vehicle arrived, start work
+          </button>
+        )}
+        {a.status === 'IN_PROGRESS' && (
+          <button className="btn btn-primary btn-sm" disabled={change.isPending} onClick={() => change.mutate('COMPLETED')}>
+            Mark as done
+          </button>
+        )}
+        {a.status === 'CONFIRMED' && started && (
+          <button className="btn btn-sm" disabled={change.isPending} onClick={() => change.mutate('NO_SHOW')}>
+            Customer did not come
+          </button>
+        )}
+        {a.status === 'CONFIRMED' && (
+          <button className="btn btn-sm btn-danger" disabled={change.isPending} onClick={() => change.mutate('CANCELLED')}>
+            Cancel booking
+          </button>
+        )}
+      </div>
+      <p className="muted small">Booked {dt(a.createdAt).toFormat('d LLL, HH:mm')}</p>
+    </div>
+  );
+}

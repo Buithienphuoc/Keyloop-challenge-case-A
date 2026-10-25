@@ -1,0 +1,61 @@
+@startuml use-case-staff
+!include _style.iuml
+title Use cases — dealership and platform staff
+left to right direction
+
+actor "Service advisor\n(also covers Sales)" as Advisor
+actor Technician as Tech
+actor "Dealership admin" as Admin
+actor "System manager" as SysMgr
+actor "Workshop controller" as Controller #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+actor "Parts staff" as Parts #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+
+Admin -|> Advisor
+
+rectangle "Unified Service Scheduler" {
+  usecase "UC02 Sign in / sign out" as UC02
+  usecase "UC30 View the workshop day board" as UC30
+  usecase "UC31 Review an advice request\n(approve with duration, skill, bay type,\nestimate — or decline)" as UC31
+  usecase "UC32 Record start, completion, no-show" as UC32
+  usecase "UC33 Cancel a booking" as UC33
+  usecase "UC40 View my jobs" as UC40
+  usecase "UC41 Start and finish a job" as UC41
+  usecase "UC50 Manage service bays" as UC50
+  usecase "UC51 Manage technicians\n(skills, shifts, working days)" as UC51
+  usecase "UC52 Manage staff accounts" as UC52
+  usecase "UC60 Onboard a dealership\nwith its first admin" as UC60
+  usecase "UC61 Monitor dealerships' capacity" as UC61
+
+  usecase "Book for a phone / walk-in customer" as F10 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+  usecase "Manage service packages and prices" as F11 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+  usecase "Edit opening hours, breaks, holidays" as F12 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+  usecase "Re-plan bays and technicians for the day" as F13 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+  usecase "Fulfil parts orders" as F14 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+}
+
+Advisor -- UC02
+Advisor -- UC30
+Advisor -- UC31
+Advisor -- UC32
+Advisor -- UC33
+Advisor .. F10
+Tech -- UC02
+Tech -- UC40
+Tech -- UC41
+Admin -- UC50
+Admin -- UC51
+Admin -- UC52
+Admin .. F11
+Admin .. F12
+SysMgr -- UC02
+SysMgr -- UC60
+SysMgr -- UC61
+Controller .. F13
+Parts .. F14
+
+
+legend bottom right
+  Solid: implemented    Dashed grey: future work
+  The dealership admin can do everything a service advisor can.
+endlegend
+@enduml

@@ -1,0 +1,20 @@
+@startuml state-appointment
+!include _style.iuml
+title Appointment lifecycle (enforced in domain/Lifecycle.scala)
+hide empty description
+
+[*] --> CONFIRMED : customer books
+CONFIRMED --> IN_PROGRESS : advisor, admin or the\nassigned technician starts
+IN_PROGRESS --> COMPLETED : advisor, admin or the\nassigned technician finishes
+CONFIRMED --> CANCELLED : customer before the start time;\nadvisor / admin before work starts
+CONFIRMED --> NO_SHOW : advisor / admin,\nafter the start time
+COMPLETED --> [*]
+CANCELLED --> [*]
+NO_SHOW --> [*]
+
+note right of CONFIRMED
+  CONFIRMED and IN_PROGRESS hold the bay,
+  the technician and the vehicle: the database's
+  EXCLUDE constraints apply only to these two.
+end note
+@enduml

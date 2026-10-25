@@ -1,0 +1,38 @@
+// Data flow diagram, level 0 (context). Render: dot -Tpng -Gdpi=150 dfd-context.dot -o dfd-context.png
+digraph context {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=20, labelloc=t, nodesep=0.5, ranksep=1.6, pad=0.4,
+         label="Data flow diagram, level 0 (context): Unified Service Scheduler\n\n"];
+  node  [fontname="Helvetica", fontsize=13, color="#1F2A30", penwidth=1.4];
+  edge  [fontname="Helvetica", fontsize=11, color="#56636B", fontcolor="#1F2A30", arrowsize=0.8];
+
+  node [shape=box, style=filled, fillcolor="#F3F5F4", width=1.9, height=0.8];
+  customer   [label="Customer"];
+  advisor    [label="Service advisor"];
+  technician [label="Technician"];
+  admin      [label="Dealership admin"];
+  sysmgr     [label="System manager"];
+  monitor    [label="Monitoring platform\n(Prometheus, log store)", style="filled,dashed"];
+
+  system [shape=circle, style=filled, fillcolor="#1D4E89", fontcolor=white, fontsize=15, width=2.6, fixedsize=true,
+          label="0\nUnified Service\nScheduler"];
+
+  { rank=same; customer; sysmgr; }
+  { rank=same; advisor; technician; admin; monitor; }
+
+  customer -> system [label="credentials, vehicle details,\nbooking request (package, dealership, start,\nIdempotency-Key), advice request, cancellation"];
+  system -> customer [label="session token, packages and checklists,\nfree slots, confirmation or 3 alternatives,\nadvice decision, appointment status"];
+
+  sysmgr -> system [label="new dealership (hours, zone, grid),\nfirst admin account"];
+  system -> sysmgr [label="dealership list with capacity"];
+
+  system -> advisor [label="day board (bays x hours),\nadvice request queue"];
+  advisor -> system [label="advice decision (duration, skill,\nbay type, estimate), start / done /\nno-show / cancel"];
+
+  system -> technician [label="today's assigned jobs"];
+  technician -> system [label="job started, job finished"];
+
+  admin -> system [label="service bays, technicians\n(skills, shifts, days), staff accounts"];
+  system -> admin [label="resource lists"];
+
+  system -> monitor [label="JSON log lines (requestId),\n/metrics, /health", style=dashed];
+}

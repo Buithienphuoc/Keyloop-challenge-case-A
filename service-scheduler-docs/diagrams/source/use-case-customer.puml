@@ -1,0 +1,59 @@
+@startuml use-case-customer
+!include _style.iuml
+title Use cases — customer
+left to right direction
+
+actor Customer
+
+rectangle "Unified Service Scheduler" {
+  usecase "UC01 Register an account" as UC01
+  usecase "UC02 Sign in / sign out" as UC02
+  usecase "UC03 Manage my vehicles" as UC03
+  usecase "UC04 Book a maintenance package" as UC04
+  usecase "UC05 Ask for an inspection\non request" as UC05
+  usecase "UC06 Ask for a customisation" as UC06
+  usecase "UC07 Book an approved request" as UC07
+  usecase "UC08 View my appointments\nand requests" as UC08
+  usecase "UC09 Cancel an appointment" as UC09
+  usecase "UC10 Withdraw a request" as UC10
+  usecase "UC11 Add an appointment\nto my calendar" as UC11
+
+  rectangle "Scheduling core" {
+    usecase "UC20 Check real-time availability\n(bay of the right type AND\nqualified technician on shift)" as UC20
+    usecase "UC21 Allocate bay and technician\n(best fit, never double-booked)" as UC21
+    usecase "UC22 Offer the nearest\nfree alternatives" as UC22
+  }
+
+  usecase "Order replacement parts" as F01 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+  usecase "Reschedule an appointment" as F02 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+  usecase "Receive reminders\n(SMS / Zalo / email)" as F03 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
+}
+
+Customer -- UC01
+Customer -- UC02
+Customer -- UC03
+Customer -- UC04
+Customer -- UC05
+Customer -- UC06
+Customer -- UC07
+Customer -- UC08
+Customer -- UC09
+Customer -- UC10
+Customer -- UC11
+Customer .. F01
+Customer .. F02
+Customer .. F03
+
+UC04 ..> UC20 : <<include>>
+UC04 ..> UC21 : <<include>>
+UC07 ..> UC20 : <<include>>
+UC07 ..> UC21 : <<include>>
+UC22 ..> UC04 : <<extend>>\nslot taken meanwhile
+UC22 ..> UC07 : <<extend>>
+UC05 ..> UC07 : <<precedes>>\nafter advisor approval
+UC06 ..> UC07 : <<precedes>>
+
+legend bottom right
+  Solid: implemented    Dashed grey: future work
+endlegend
+@enduml

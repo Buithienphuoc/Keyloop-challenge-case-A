@@ -1,0 +1,16 @@
+{
+  "name": "service-scheduler",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Unified Service Scheduler – Keyloop technical assessment (Scenario A)",
+  "scripts": {
+    "setup": "npm --prefix frontend install",
+    "dev": "node scripts/dev.mjs",
+    "test": "cd backend && sbt test",
+    "test:load": "cd backend && sbt loadTest",
+    "typecheck": "npm --prefix frontend run typecheck"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,71 @@
+@startuml activity-consult-first
+!include _style.iuml
+title Activity — inspection on request / customisation (UC05, UC06, UC31, UC07)
+
+|Customer|
+|Service advisor|
+|System|
+|Customer|
+start
+:Choose "Check something specific"
+or "Customise my vehicle";
+:Pick the vehicle and the areas,
+describe it in own words, pick a dealership;
+:Send to an advisor;
+|System|
+:Store the request: **SUBMITTED**,
+log consultation.submitted;
+|Service advisor|
+:Open the "Waiting for advice" queue;
+:Read the areas and the description;
+if (Can the workshop do it?) then (no)
+  :Decline with a message to the customer;
+  |System|
+  :**REJECTED**;
+  |Customer|
+  :Read the advisor's reason;
+  stop
+else (yes)
+  |Service advisor|
+  :Set time needed, skill, bay type,
+  estimate and a message, then approve;
+  note right
+    The server checks the bay type fits the vehicle
+    and the skill exists; if not → 422 and the
+    advisor corrects it.
+  end note
+  |System|
+  :**APPROVED**, log consultation.reviewed;
+endif
+|Customer|
+:See the reply on Home and on Requests
+(duration, estimate, advisor's note);
+if (Book it?) then (withdraw)
+  |System|
+  :**CANCELLED**;
+  stop
+else (pick a time)
+  repeat
+    |Customer|
+    :Pick a start time — only times with a bay of the
+    approved type and a technician with the approved skill;
+    |System|
+  repeat while (Still APPROVED and the slot still free?) is (slot taken: offer alternatives)
+  -> yes;
+  note right
+    Already booked by another tab or device
+    → 409 CONSULTATION_NOT_BOOKABLE
+  end note
+  :In one transaction: appointment **CONFIRMED**,
+  request **BOOKED**;
+endif
+|Customer|
+if (Cancels before the start?) then (yes)
+  |System|
+  :Appointment CANCELLED,
+  request back to **APPROVED**
+  so another time can be picked;
+else (no)
+endif
+stop
+@enduml

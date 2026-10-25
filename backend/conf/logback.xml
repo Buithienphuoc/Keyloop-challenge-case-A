@@ -1,0 +1,34 @@
+<!--
+  Structured logs: one JSON object per line on stdout (ship them to any log platform and query
+  by field). Set LOG_FORMAT=pretty for a compact human-readable line while developing.
+  LOG_LEVEL sets the application's level (default INFO).
+-->
+<configuration>
+  <variable name="LOG_LEVEL" value="${LOG_LEVEL:-INFO}" />
+
+  <appender name="json" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <customFields>{"service":"service-scheduler"}</customFields>
+      <fieldNames>
+        <message>event</message>
+        <levelValue>[ignore]</levelValue>
+        <version>[ignore]</version>
+      </fieldNames>
+    </encoder>
+  </appender>
+
+  <appender name="pretty" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %msg%n%ex</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="scheduler" level="${LOG_LEVEL}" />
+  <logger name="org.flywaydb" level="WARN" />
+  <logger name="com.zaxxer.hikari" level="WARN" />
+  <logger name="io.zonky" level="WARN" />
+
+  <root level="INFO">
+    <appender-ref ref="${LOG_FORMAT:-json}" />
+  </root>
+</configuration>

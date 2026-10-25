@@ -1,0 +1,17 @@
+node_modules/
+.data*/
+dist/
+*.log
+.env
+.DS_Store
+coverage/
+# sbt / Scala
+target/
+.bsp/
+.metals/
+.bloop/
+.idea/
+.vscode/
+metals.sbt
+RUNNING_PID
+
