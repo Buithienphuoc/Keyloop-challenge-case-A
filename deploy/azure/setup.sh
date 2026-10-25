@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-off Azure set-up for the Service Scheduler. Run it in Azure Cloud Shell (Bash):
 #
-#   curl -fsSL https://raw.githubusercontent.com/Buithienphuoc/keyloop-challenge-case-a/master/deploy/azure/setup.sh -o setup.sh
+#   curl -fsSL https://raw.githubusercontent.com/Buithienphuoc/Keyloop-challenge-case-A/master/deploy/azure/setup.sh -o setup.sh
 #   bash setup.sh
 #
 # It creates, in one resource group:
@@ -20,7 +20,7 @@ set -euo pipefail
 
 LOCATION="${LOCATION:-japaneast}" # Azure for Students only allows a few regions
 RG="${RG:-rg-service-scheduler}"
-GITHUB_REPO="${GITHUB_REPO:-Buithienphuoc/keyloop-challenge-case-a}"
+GITHUB_REPO="${GITHUB_REPO:-Buithienphuoc/Keyloop-challenge-case-A}"
 PG_VERSION="${PG_VERSION:-16}"
 
 STATE="$HOME/.service-scheduler-azure.env"

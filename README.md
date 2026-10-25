@@ -136,7 +136,7 @@ scaled on concurrent requests; web: public HTTPS) and smoke-tests the live site.
 to Azure with OpenID Connect, so no password is stored. One-off Azure set-up, in Cloud Shell:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Buithienphuoc/keyloop-challenge-case-a/master/deploy/azure/setup.sh -o setup.sh
+curl -fsSL https://raw.githubusercontent.com/Buithienphuoc/Keyloop-challenge-case-A/master/deploy/azure/setup.sh -o setup.sh
 bash setup.sh   # then add the 5 printed values as GitHub repository variables
 ```
 
