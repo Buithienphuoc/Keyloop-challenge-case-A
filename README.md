@@ -106,6 +106,27 @@ the pool. To scale out, run more instances behind a load balancer: the API keeps
 memory (sessions are in the database), and the no-double-booking rule is enforced by PostgreSQL,
 so it holds across any number of instances.
 
+### End-to-end tests in a real browser (Selenium, Scala)
+
+`e2e/` is a separate sbt project: ScalaTest drives Chrome through the running web app, the way a
+person would (by visible text, labels and roles; it waits for the page and never sleeps).
+
+```bash
+docker compose --profile full up -d --build   # the system under test: 3 API instances behind nginx
+cd e2e && sbt test                            # BASE_URL=http://localhost:8080 by default; HEADLESS=false to watch
+```
+
+| Suite (`e2e/src/test/scala/scheduler/e2e/…`) | What it does |
+| --- | --- |
+| `BookingJourneySpec` | One booking across every role: a new customer registers, adds a motorbike, picks a package, **holds** a time, gives it back, holds it again and confirms; sends an advice request. The advisor finds the job on the day board and the request in the queue; the workshop controller checks the workload and **moves** the job to another bay and technician; that technician sees it (with the customer's note) and **requests a part**; the parts desk restocks and **issues** it; the customer **cancels**. Leaves the demo data as it found it |
+| `AuthSpec` | Wrong password, demo-account buttons, sign-out, a customer kept out of staff pages, each role's start page |
+| `BackOfficeSpec` | Dealership admin: bays, technicians, saving opening hours. System manager: dealerships and the package catalogue |
+
+26 tests, about a minute. CI runs them on every pull request against the freshly built images;
+a failure uploads a screenshot of each failing step and the API logs. Writing them found a real
+bug: behind nginx, Play's CORS filter refused the browser's sign-in (403), now fixed by setting
+`CORS_ORIGIN` to the web app's address in docker-compose and on Azure.
+
 ## Scale out and deploy
 
 The API keeps nothing that matters in memory: sessions, holds and the no-double-booking rule all

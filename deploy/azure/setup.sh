@@ -117,6 +117,12 @@ for assignment in "Contributor|$RG_ID" "AcrPush|$ACR_ID"; do
 done
 
 WEB_URL="https://$(az containerapp show -g "$RG" -n scheduler-web --query properties.configuration.ingress.fqdn -o tsv)"
+
+step "Allow the web app's origin on the API"
+# nginx forwards /api under the API's internal host name, so Play sees the browser's requests as
+# cross-origin; the public web address must be on its CORS list.
+[ "$(az containerapp show -g "$RG" -n scheduler-api --query "properties.template.containers[0].env[?name=='CORS_ORIGIN'].value | [0]" -o tsv)" = "$WEB_URL" ] ||
+  az containerapp update -g "$RG" -n scheduler-api --set-env-vars "CORS_ORIGIN=$WEB_URL" -o none
 cat <<DONE
 
 $(printf '\033[1;32m')Azure is ready.$(printf '\033[0m')

@@ -35,6 +35,9 @@ services:
       DATABASE_URL: postgres://scheduler:scheduler@postgres:5432/scheduler
       # Three instances share a 100-connection PostgreSQL comfortably.
       DB_POOL_SIZE: '15'
+      # The browser's origin. nginx forwards /api under the upstream's host name, so to Play the
+      # web app's requests look cross-origin and must be allowed explicitly.
+      CORS_ORIGIN: http://localhost:8080
       LOG_FORMAT: json
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf

@@ -28,6 +28,10 @@ This document uses two terms for dates:
 - **D+1**: the next day District 1 is open after today. District 1 is open Monday to Saturday,
   so D+1 is tomorrow, or Monday when today is Saturday. In the screenshots D+1 is Monday 26 October.
 
+Most of these cases are also automated: `e2e/` runs them in Chrome with Selenium (Scala), on
+every pull request (see "End-to-end tests" in the README). The manual run remains the reference
+for what the screens should look like.
+
 ## 2. Test environment
 
 | Item | Value |
