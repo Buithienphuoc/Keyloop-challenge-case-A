@@ -120,4 +120,5 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
    Added; the backend suite is now 95 tests (plus the 1000-request load test).
 2. **UC03, UC51, UC52 are partial** (see tables). Either build the missing edits or redraw these
    use cases with a narrower name before submission.
-3. Nothing in the code contradicts a drawn flow.
+3. ~~Nothing in the code contradicts a drawn flow.~~ Since the hold, workshop controller and
+   parts releases, several do: see [the end-to-end traceability](../e2e-traceability.md#where-the-code-and-the-diagrams-disagree).

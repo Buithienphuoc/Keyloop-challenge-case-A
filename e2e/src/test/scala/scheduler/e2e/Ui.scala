@@ -26,6 +26,9 @@ object Settings:
   val Zone: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
   val DemoPassword = "Demo@2026"
 
+  /** Where Chrome saves downloads (the .ics calendar file). */
+  val downloads: Path = Path.of("target", "downloads").toAbsolutePath
+
 /**
  * A thin layer over Selenium for this app: find things the way a person would (by visible
  * text, label or role), wait for them instead of sleeping, and log each step so a failing
@@ -98,6 +101,18 @@ final class Ui(val driver: WebDriver):
     input.clear()
     input.sendKeys(value)
 
+  /** Types into the input whose id is `id`, for forms where two fields share a label. */
+  def fillId(id: String, value: String): Unit =
+    step(s"fill #$id")
+    val input = visible(By.id(id))
+    input.clear()
+    input.sendKeys(value)
+
+  /** The input, select or textarea labelled `label` inside `scope` (one card among many). */
+  def inputIn(scope: WebElement, label: String): WebElement =
+    val forId = scope.findElement(By.xpath(s".//label[normalize-space(.)=${Ui.literal(label)}]")).getAttribute("for")
+    scope.findElement(By.id(forId))
+
   def select(label: String): Select = Select(visible(inputFor(label)))
 
   def inputFor(label: String): By =
@@ -157,6 +172,11 @@ object Ui:
       "--disable-dev-shm-usage",
       "--disable-search-engine-choice-screen"
     )
+    Files.createDirectories(Settings.downloads)
+    options.setExperimentalOption("prefs", java.util.Map.of(
+      "download.default_directory", Settings.downloads.toString,
+      "download.prompt_for_download", false
+    ))
     // The app is on plain http://localhost; never send it through an outbound proxy.
     options.addArguments("--proxy-server=direct://", "--proxy-bypass-list=*")
     val driver = ChromeDriver(options)

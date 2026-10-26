@@ -114,6 +114,7 @@ person would (by visible text, labels and roles; it waits for the page and never
 ```bash
 docker compose --profile full up -d --build   # the system under test: 3 API instances behind nginx
 cd e2e && sbt test                            # BASE_URL=http://localhost:8080 by default; HEADLESS=false to watch
+# or against `npm run dev`: BASE_URL=http://localhost:5173 sbt test
 ```
 
 | Suite (`e2e/src/test/scala/scheduler/e2e/…`) | What it does |
@@ -121,8 +122,14 @@ cd e2e && sbt test                            # BASE_URL=http://localhost:8080 b
 | `BookingJourneySpec` | One booking across every role: a new customer registers, adds a motorbike, picks a package, **holds** a time, gives it back, holds it again and confirms; sends an advice request. The advisor finds the job on the day board and the request in the queue; the workshop controller checks the workload and **moves** the job to another bay and technician; that technician sees it (with the customer's note) and **requests a part**; the parts desk restocks and **issues** it; the customer **cancels**. Leaves the demo data as it found it |
 | `AuthSpec` | Wrong password, demo-account buttons, sign-out, a customer kept out of staff pages, each role's start page |
 | `BackOfficeSpec` | Dealership admin: bays, technicians, saving opening hours. System manager: dealerships and the package catalogue |
+| `ConsultFirstSpec` | The consult-first activity diagram: an inspection and a customisation request; the advisor approves one (time, skill, estimate, message) and declines the other (a reason is required); the customer reads both replies, books the approved one, cancels it (the request re-opens) and withdraws it |
+| `WorkshopDaySpec` | The workshop day diagram and the appointment lifecycle: no-show is not offered before the start; the advisor starts and finishes one job, the admin hands another to tech.hung, who starts and finishes it in My jobs; the advisor cancels a third; the customer sees Done and Cancelled |
+| `BookingRulesSpec` | The checks in the booking diagram: My vehicles; only packages for the vehicle's type; "cannot do this job" at a dealership without a car lift; another customer takes the chosen time first (through the API), so the page offers the nearest free times and one is booked; the `.ics` calendar file |
+| `AdminSpec` | Set-up that someone else then uses: the admin adds a bay (and takes it out of service), a technician with a login and an advisor account, and both sign in; the system manager onboards a dealership, sees its zero capacity, its admin signs in, and customers are told it cannot do the job yet. Adds rows, tagged with the run, that only a database reset removes |
 
-26 tests, about a minute. CI runs them on every pull request against the freshly built images;
+57 tests, about two minutes. Each use case and activity-diagram branch is mapped to its test in
+[docs/e2e-traceability.md](docs/e2e-traceability.md), together with the places where the code
+has moved ahead of the diagrams. CI runs them on every pull request against the freshly built images;
 a failure uploads a screenshot of each failing step and the API logs. Writing them found a real
 bug: behind nginx, Play's CORS filter refused the browser's sign-in (403), now fixed by setting
 `CORS_ORIGIN` to the web app's address in docker-compose and on Azure.
