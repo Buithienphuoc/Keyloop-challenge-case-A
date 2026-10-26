@@ -13,6 +13,13 @@ Entry format:
 
 ## Unreleased
 
+### #12 Azure setup works on express Container Apps environments (`fix/azure-express-env`)
+- **Fixed:** `deploy/azure/setup.sh` no longer stops at the web app with
+  "ExpressEnvironmentFeatureNotSupported": both apps now pull images with the registry's admin
+  user instead of a system-assigned managed identity, and an app created by an earlier run is
+  switched over.
+- **Upgrade notes:** if a run stopped at "Web app scheduler-web", run the script again.
+
 ### #11 Azure setup works with the current Azure CLI (`fix/azure-setup-cli`)
 - **Fixed:** `deploy/azure/setup.sh` no longer stops at PostgreSQL ("--database-name ... only
   applies to elastic clusters"); the `scheduler` database is created with its own command.

@@ -65,6 +65,12 @@ az group create -n "$RG" -l "$LOCATION" -o none
 step "Container registry $ACR"
 exists az acr show -g "$RG" -n "$ACR" || az acr create -g "$RG" -n "$ACR" -l "$LOCATION" --sku Basic -o none
 ACR_SERVER=$(az acr show -g "$RG" -n "$ACR" --query loginServer -o tsv)
+# The apps pull with the registry's admin user. Newer Container Apps environments ("express")
+# reject a managed identity for registry sign-in, and a user name and password work on every kind.
+az acr update -n "$ACR" --admin-enabled true -o none
+ACR_USER=$(az acr credential show -n "$ACR" --query username -o tsv)
+ACR_PASSWORD=$(az acr credential show -n "$ACR" --query "passwords[0].value" -o tsv)
+REGISTRY=(--registry-server "$ACR_SERVER" --registry-username "$ACR_USER" --registry-password "$ACR_PASSWORD")
 
 step "PostgreSQL $PG (takes 5-10 minutes the first time)"
 if ! exists az postgres flexible-server show -g "$RG" -n "$PG"; then
@@ -95,7 +101,7 @@ if ! exists az containerapp show -g "$RG" -n scheduler-api; then
     --ingress internal --target-port 80 \
     --cpu 0.5 --memory 1.0Gi --min-replicas 1 --max-replicas 5 \
     --scale-rule-name http-load --scale-rule-type http --scale-rule-http-concurrency 30 \
-    --registry-server "$ACR_SERVER" --registry-identity system \
+    "${REGISTRY[@]}" \
     --secrets "database-url=$DATABASE_URL" "app-secret=$APP_SECRET" \
     --env-vars DATABASE_URL=secretref:database-url APPLICATION_SECRET=secretref:app-secret DB_POOL_SIZE=8 LOG_FORMAT=json \
     -o none
@@ -112,10 +118,17 @@ if ! exists az containerapp show -g "$RG" -n scheduler-web; then
     --ingress external --target-port 80 \
     --cpu 0.25 --memory 0.5Gi --min-replicas 1 --max-replicas 3 \
     --scale-rule-name http-load --scale-rule-type http --scale-rule-http-concurrency 100 \
-    --registry-server "$ACR_SERVER" --registry-identity system \
+    "${REGISTRY[@]}" \
     --env-vars API_UPSTREAM=scheduler-api \
     -o none
 fi
+
+step "Registry sign-in for both apps"
+# An app made by an earlier run of this script may still name a managed identity: switch it over.
+for app in scheduler-api scheduler-web; do
+  [ -n "$(az containerapp show -g "$RG" -n "$app" --query "properties.configuration.registries[0].username" -o tsv)" ] ||
+    az containerapp registry set -g "$RG" -n "$app" "${REGISTRY[@]/--registry-/--}" -o none
+done
 
 step "Identity for GitHub Actions ($GITHUB_REPO)"
 exists az identity show -g "$RG" -n "$IDENTITY" || az identity create -g "$RG" -n "$IDENTITY" -l "$LOCATION" -o none
