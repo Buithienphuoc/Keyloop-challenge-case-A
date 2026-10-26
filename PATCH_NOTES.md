@@ -14,9 +14,13 @@ Entry format:
 ## Unreleased
 
 ### #9 Patch notes moved to their merge date (`docs/patch-notes-2026-10-26`)
-- **Docs:** the entries for #3–#8 move from Unreleased to 26 October 2026, the day they merged.
+- **Docs:** the entries for #3–#8 and #10 move from Unreleased to 26 October 2026, the day they merged.
 
 ## 2026-10-26
+
+### #10 E2E traceability after the diagram redraw (`docs/e2e-gaps-after-3`)
+- **Docs:** `docs/e2e-traceability.md` marks the diagram gaps fixed in #3; starting a job
+  before its day stays open as question Q1.
 
 ### #8 End-to-end tests for every use case and activity branch (`e2e/use-case-coverage`)
 - **Tests:** 31 new Selenium tests (57 in total): `ConsultFirstSpec`, `WorkshopDaySpec`,
