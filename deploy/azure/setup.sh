@@ -92,7 +92,21 @@ az postgres flexible-server parameter set -g "$RG" -s "$PG" --name azure.extensi
 DATABASE_URL="jdbc:postgresql://${PG}.postgres.database.azure.com:5432/scheduler?user=scheduler&password=${DB_PASSWORD}&sslmode=require"
 
 step "Container Apps environment $CAE"
-exists az containerapp env show -g "$RG" -n "$CAE" || az containerapp env create -g "$RG" -n "$CAE" -l "$LOCATION" -o none
+# The environment must be a standard (Consumption) one. Azure can hand out an "express"
+# environment instead, and express has no internal service discovery (nginx could not reach
+# scheduler-api by name) and fails image pulls after app updates. An express environment left by
+# an earlier run is replaced: its apps only hold the placeholder or a re-deployable image, and
+# the database lives outside it.
+mode=$(az containerapp env show -g "$RG" -n "$CAE" --query properties.environmentMode -o tsv 2>/dev/null || true)
+if [ "$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')" = express ]; then
+  echo "    ($CAE is an express environment: replacing it with a standard one, ~5 minutes)"
+  for app in scheduler-api scheduler-web; do
+    ! exists az containerapp show -g "$RG" -n "$app" || az containerapp delete -g "$RG" -n "$app" --yes -o none
+  done
+  az containerapp env delete -g "$RG" -n "$CAE" --yes -o none
+fi
+exists az containerapp env show -g "$RG" -n "$CAE" ||
+  az containerapp env create -g "$RG" -n "$CAE" -l "$LOCATION" --environment-mode ConsumptionOnly -o none
 
 step "API app scheduler-api (internal, 1-5 replicas)"
 # Express environments refuse any change to an app that has a managed identity, and the first
