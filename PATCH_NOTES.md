@@ -13,6 +13,12 @@ Entry format:
 
 ## Unreleased
 
+### #14 GitHub Actions can sign in to Azure (`fix/azure-oidc-subject`)
+- **Fixed:** the CI/CD "Sign in to Azure" step failed with AADSTS700213 because GitHub names this
+  repository in its OpenID Connect token by numeric ids (`Buithienphuoc@37607399/Keyloop-challenge-case-A@1432964156`).
+  `deploy/azure/setup.sh` now registers federated credentials for that form as well as `owner/repo`.
+- **Upgrade notes:** run the script again (or add the two credentials by hand), then re-run CI/CD on master.
+
 ### #13 Azure setup re-creates apps that still have a managed identity (`fix/azure-express-identity`)
 - **Fixed:** re-running `deploy/azure/setup.sh` no longer stops at "Allow the web app's origin on
   the API" with "ExpressEnvironmentFeatureNotSupported": an app the first version of the script
