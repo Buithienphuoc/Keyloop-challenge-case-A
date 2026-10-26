@@ -79,8 +79,8 @@ elif [ "$NEW_PASSWORD" = true ]; then
 fi
 # Newer Azure CLI versions only accept --database-name for elastic clusters, so the database is
 # created on its own.
-exists az postgres flexible-server db show -g "$RG" -s "$PG" -d scheduler ||
-  az postgres flexible-server db create -g "$RG" -s "$PG" -d scheduler -o none
+exists az postgres flexible-server db show -g "$RG" -s "$PG" -n scheduler ||
+  az postgres flexible-server db create -g "$RG" -s "$PG" -n scheduler -o none
 # The schema uses btree_gist for its no-double-booking constraints; Azure needs it allow-listed.
 az postgres flexible-server parameter set -g "$RG" -s "$PG" --name azure.extensions --value BTREE_GIST,PGCRYPTO -o none
 DATABASE_URL="jdbc:postgresql://${PG}.postgres.database.azure.com:5432/scheduler?user=scheduler&password=${DB_PASSWORD}&sslmode=require"
