@@ -13,6 +13,11 @@ Entry format:
 
 ## Unreleased
 
+### #9 Patch notes moved to their merge date (`docs/patch-notes-2026-10-26`)
+- **Docs:** the entries for #3–#8 move from Unreleased to 26 October 2026, the day they merged.
+
+## 2026-10-26
+
 ### #8 End-to-end tests for every use case and activity branch (`e2e/use-case-coverage`)
 - **Tests:** 31 new Selenium tests (57 in total): `ConsultFirstSpec`, `WorkshopDaySpec`,
   `BookingRulesSpec` and `AdminSpec` walk every drawn use case and every branch of the three
@@ -55,8 +60,6 @@ Entry format:
   It has findings R1–R13 and the open questions Q1 (starting a job before its day) and Q2
   (the advice form's default dealership).
 - **Docs:** this patch notes file.
-
-## 2026-10-26
 
 ### #2 Remaining features, scale-out proof and CI/CD to Azure (`feature/scalable-extras`)
 - **Added:** a hold step before confirming (10 minutes, released by a sweeper), the workshop
