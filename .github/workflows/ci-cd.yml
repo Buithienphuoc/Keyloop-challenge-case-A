@@ -9,6 +9,10 @@
 # repository variables (Settings → Secrets and variables → Actions → Variables):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID   (+ optional AZURE_RESOURCE_GROUP, AZURE_ACR)
 # GitHub signs in to Azure with OpenID Connect, so no password is stored anywhere.
+#
+# The site runs the API's prod profile on its own database (scheduler_prod). Its demo accounts get
+# the passwords in the repository SECRET PROD_SEED_ACCOUNTS (hashes only, made with
+# deploy/azure/prod-accounts.py); the web app's production build never shows any account.
 name: CI/CD
 
 on:
@@ -156,12 +160,34 @@ jobs:
       RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-service-scheduler' }}
       REGISTRY: ${{ needs.images.outputs.registry }}
     steps:
+      - name: Check the production account passwords are set
+        env:
+          SEED_ACCOUNTS: ${{ secrets.PROD_SEED_ACCOUNTS }}
+        run: |
+          [ -n "$SEED_ACCOUNTS" ] && exit 0
+          echo "::error title=PROD_SEED_ACCOUNTS missing::Add the repository secret PROD_SEED_ACCOUNTS (made by deploy/azure/prod-accounts.py) so the production accounts get their own passwords."
+          exit 1
       - uses: actions/checkout@v4
       - uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Production database and account passwords
+        env:
+          SEED_ACCOUNTS: ${{ secrets.PROD_SEED_ACCOUNTS }}
+        run: |
+          # Production keeps its own database next to the original one on the same server, so it
+          # starts from a clean seed with the production passwords. Both steps are no-ops once done.
+          pg=$(az postgres flexible-server list -g "$RESOURCE_GROUP" --query '[0].name' -o tsv)
+          az postgres flexible-server db show -g "$RESOURCE_GROUP" -s "$pg" -n scheduler_prod -o none 2>/dev/null ||
+            az postgres flexible-server db create -g "$RESOURCE_GROUP" -s "$pg" -n scheduler_prod -o none
+          url=$(az containerapp secret show -g "$RESOURCE_GROUP" -n scheduler-api --secret-name database-url --query value -o tsv)
+          echo "::add-mask::$url"
+          prod_url=$(sed -E 's#/scheduler(\?|$)#/scheduler_prod\1#' <<< "$url")
+          # Secrets change without a new revision; the image update below starts one that reads them.
+          az containerapp secret set -g "$RESOURCE_GROUP" -n scheduler-api \
+            --secrets "database-url=$prod_url" "seed-accounts=$SEED_ACCOUNTS" -o none
       - name: Roll out the new images
         id: rollout
         run: |
@@ -177,7 +203,9 @@ jobs:
           done
           # API first: the database migrates on its start-up, before the new web app needs it.
           az containerapp update -g "$RESOURCE_GROUP" -n scheduler-api \
-            --image "$REGISTRY/service-scheduler-api:${{ github.sha }}" --only-show-errors -o none
+            --image "$REGISTRY/service-scheduler-api:${{ github.sha }}" \
+            --set-env-vars APP_PROFILE=prod SEED_ACCOUNT_PASSWORDS=secretref:seed-accounts \
+            --only-show-errors -o none
           az containerapp update -g "$RESOURCE_GROUP" -n scheduler-web \
             --image "$REGISTRY/service-scheduler-web:${{ github.sha }}" --only-show-errors -o none
           fqdn=$(az containerapp show -g "$RESOURCE_GROUP" -n scheduler-web --query properties.configuration.ingress.fqdn -o tsv)
@@ -187,11 +215,20 @@ jobs:
           url="${{ steps.rollout.outputs.url }}"
           for i in $(seq 1 40); do
             if curl -fsS "$url/health" && curl -fsS -o /dev/null "$url/"; then
-              echo; echo "Live at $url"; exit 0
+              echo; echo "Live at $url"; break
             fi
+            [ "$i" = 40 ] && { echo "The site did not become healthy in time" >&2; exit 1; }
             sleep 10
           done
-          echo "The site did not become healthy in time" >&2; exit 1
+          # The prod profile is on: the public demo password signs nobody in, and no web app file
+          # carries it.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+            -d '{"email":"customer@demo.vn","password":"Demo@2026"}' "$url/api/auth/login")
+          [ "$status" = 401 ] || { echo "::error::The demo password still signs in on production (HTTP $status)"; exit 1; }
+          for asset in $(curl -fsS "$url/" | grep -oE '/assets/[^"]+\.js'); do
+            ! curl -fsS "$url$asset" | grep -q 'Demo@2026' || { echo "::error::$asset contains the demo password"; exit 1; }
+          done
+          echo "Production profile checks passed"
       - name: Show why a rollout failed
         if: failure()
         run: |

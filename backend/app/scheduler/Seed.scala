@@ -10,12 +10,30 @@ import scheduler.modules.identity.Passwords
 import scheduler.modules.scheduling.adapters.PgSchedulingStore
 import scheduler.modules.scheduling.application.{AppointmentEvent, NewAppointment}
 import scheduler.modules.scheduling.domain.{AppointmentStatus, Availability, Requirement}
-import scheduler.shared.{Db, DbSession, Ids, Log, Sql}
+import scheduler.shared.{Config, Db, DbSession, Ids, Log, Profile, Sql}
 import scheduler.shared.Sql.{*, given}
 
-/** Demo data so the app is usable straight after `sbt run`. Passwords are documented in the README. */
+/**
+ * Demo data so the app is usable straight after `sbt run`. In the dev profile every account uses
+ * the password documented in the README; in prod each one gets its own from the configuration.
+ */
 object Seed:
   val DemoPassword = "Demo@2026"
+
+  /** Stored for an account that has no password: not a valid hash, so no password signs in. */
+  val Locked = "locked"
+
+  /** Demo account email -> the password hash to store when the account is created. */
+  def passwordsFor(config: Config): String => String = config.profile match
+    case Profile.Dev =>
+      val demo = Passwords.hash(DemoPassword)
+      _ => demo
+    case Profile.Prod =>
+      val hashes = config.seedAccountPasswords.map { (email, password) =>
+        require(password != DemoPassword, s"SEED_ACCOUNT_PASSWORDS: $email uses the public demo password")
+        email -> (if password.startsWith("pbkdf2-sha512$") then password else Passwords.hash(password))
+      }
+      email => hashes.getOrElse(email.toLowerCase, Locked)
   private val Zone = ZoneId.of("Asia/Ho_Chi_Minh")
   private val MonSat = Seq(1, 2, 3, 4, 5, 6)
 
@@ -96,8 +114,7 @@ object Seed:
    * too. Several API instances may start at once: an advisory lock lets one seed at a time.
    * Returns whether the base data was loaded.
    */
-  def demoData(db: Db, log: Log, now: Instant = Instant.now()): Boolean =
-    val pw = Passwords.hash(DemoPassword)
+  def demoData(db: Db, log: Log, pw: String => String, now: Instant = Instant.now()): Boolean =
     val (loaded, added) = db.tx { s =>
       given Connection = Sql.connection(s)
       SQL"SELECT pg_advisory_xact_lock(hashtextextended('scheduler:seed', 0))".execute()
@@ -105,18 +122,18 @@ object Seed:
       if empty then load(s, pw, now)
       (empty, topUp(s, pw))
     }
-    if loaded then log.info("seed.demo_data_loaded", "demoPasswordInReadme" -> true)
+    if loaded then log.info("seed.demo_data_loaded")
     if added > 0 then log.info("seed.demo_data_topped_up", "rowsAdded" -> added)
     loaded
 
   /** Demo accounts and parts added after the first release. Inserts only what is missing. */
-  private def topUp(s: DbSession, pw: String): Int =
+  private def topUp(s: DbSession, pw: String => String): Int =
     given Connection = Sql.connection(s)
     val dealerships = SQL"SELECT code, id FROM dealerships WHERE code IN ('HCM-D1', 'HCM-TD')"
       .as(Sql.rows(r => r.str("code") -> r.uuid("id")).*).toMap
     def user(email: String, fullName: String, role: String, dealershipId: String): Int =
       SQL"""INSERT INTO users (email, password_hash, full_name, role, dealership_id)
-            VALUES ($email, $pw, $fullName, $role, $dealershipId::uuid) ON CONFLICT ((lower(email))) DO NOTHING""".executeUpdate()
+            VALUES ($email, ${pw(email)}, $fullName, $role, $dealershipId::uuid) ON CONFLICT ((lower(email))) DO NOTHING""".executeUpdate()
     def part(dealershipId: String, sku: String, name: String, price: Int, stock: Int): Int =
       SQL"""INSERT INTO parts (dealership_id, sku, name, unit_price, stock_qty)
             VALUES ($dealershipId::uuid, $sku, $name, $price, $stock) ON CONFLICT (dealership_id, sku) DO NOTHING""".executeUpdate()
@@ -143,7 +160,7 @@ object Seed:
     ("CAR-OIL-FILTER", "Oil filter (car)", 210_000, 10)
   )
 
-  private def load(s: DbSession, pw: String, now: Instant): Unit =
+  private def load(s: DbSession, pw: String => String, now: Instant): Unit =
     given Connection = Sql.connection(s)
     def id(sql: SimpleSql[Row]): String = sql.as(SqlParser.scalar[UUID].single).toString
 
@@ -178,7 +195,7 @@ object Seed:
     def user(email: String, fullName: String, role: String, dealershipId: Option[String], phone: Option[String] = None) =
       id(SQL"""
         INSERT INTO users (email, password_hash, full_name, role, dealership_id, phone)
-        VALUES ($email, $pw, $fullName, $role, CAST(${dealershipId} AS uuid), $phone) RETURNING id""")
+        VALUES ($email, ${pw(email)}, $fullName, $role, CAST(${dealershipId} AS uuid), $phone) RETURNING id""")
 
     user("sysadmin@demo.vn", "Platform Manager", "SYSTEM_MANAGER", None)
     user("admin.d1@demo.vn", "Đặng Thu Hà", "ADMIN", Some(d1))

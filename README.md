@@ -31,7 +31,8 @@ to switch, change `scalaVersion` in `backend/build.sbt` (sbt downloads the compi
 Running only the API: `cd backend && sbt run`. Production-style package: `sbt stage`, then
 `backend/target/universal/stage/bin/service-scheduler`.
 
-All demo accounts use the password **`Demo@2026`** (the login page has one-tap buttons):
+All demo accounts use the password **`Demo@2026`** in the dev profile (the login page of the
+`npm run dev` server on localhost has one-tap buttons):
 
 | Account | Role | Try this |
 | --- | --- | --- |
@@ -55,13 +56,32 @@ Using your own PostgreSQL instead: `docker compose up -d`, then
 | `DATABASE_URL` | empty → embedded PostgreSQL | `postgres://…` or `jdbc:postgresql://…` |
 | `PORT` | 8081 | HTTP port (packaged server) |
 | `CORS_ORIGIN` | `http://localhost:5173` | Comma-separated allowed browser origins |
+| `APP_PROFILE` | dev | `dev` or `prod`, see [Profiles](#profiles-dev-and-prod) |
 | `SEED_DEMO_DATA` | true | Load demo data into an empty database |
+| `SEED_ACCOUNT_PASSWORDS` | empty | prod only: `email=password` (or `email=<pbkdf2 hash>`) per demo account, `;`-separated |
 | `LOG_FORMAT` / `LOG_LEVEL` | json / INFO | `pretty` for readable local lines |
 | `SLOW_QUERY_MS` | 200 | Log queries slower than this |
 | `SESSION_TTL_HOURS` | 12 | Sign-in lifetime |
 | `APPLICATION_SECRET` | dev value | Required by Play in production |
 | `HOLD_MINUTES` / `HOLD_SWEEP_SECONDS` | 10 / 30 | How long a held slot is kept; how often expired holds are released |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | empty → no export | Send traces over OTLP, e.g. `http://jaeger:4318` |
+
+### Profiles: dev and prod
+
+| | dev (default) | prod (the Azure site) |
+| --- | --- | --- |
+| Where | your computer: `npm run dev`, `sbt run`, docker-compose, CI | Azure Container Apps only |
+| Database | embedded or local PostgreSQL | its own database, `scheduler_prod` |
+| Demo account passwords | all `Demo@2026` | one strong password each, from `SEED_ACCOUNT_PASSWORDS`; an account left out is locked, and `Demo@2026` is refused |
+| Login page | one-tap demo accounts (dev server on localhost only) | no accounts shown: the production build of the web app does not contain them |
+| Start-up checks | refuses to run on Azure Container Apps | needs `DATABASE_URL` and `APPLICATION_SECRET` |
+
+The production passwords are made by `python3 deploy/azure/prod-accounts.py <folder>`, which
+writes the accounts with their passwords (`prod-accounts.txt`, keep it private) and the same list
+with only PBKDF2 hashes (`PROD_SEED_ACCOUNTS.secret.txt`). The hashes go into the GitHub secret
+`PROD_SEED_ACCOUNTS`; the deploy job hands them to the API, so no password is in the repository,
+the web app or the Azure configuration. The passwords apply when the accounts are created, on an
+empty database.
 
 ## Tests
 
@@ -177,6 +197,7 @@ to Azure with OpenID Connect, so no password is stored. One-off Azure set-up, in
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Buithienphuoc/Keyloop-challenge-case-A/master/deploy/azure/setup.sh -o setup.sh
 bash setup.sh   # then add the 5 printed values as GitHub repository variables
+                # and the PROD_SEED_ACCOUNTS secret (see Profiles above)
 ```
 
 ## What it does
