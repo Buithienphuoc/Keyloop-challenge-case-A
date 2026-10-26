@@ -13,6 +13,23 @@ Entry format:
 
 ## Unreleased
 
+### #18 Azure setup uses a standard Container Apps environment (`fix/azure-standard-env`)
+- **Fixed:** the apps ran on an "express" Container Apps environment, which has no internal
+  service discovery (the web app's nginx could not reach `scheduler-api` by name) and kept
+  failing image pulls with "Authentication failed" after app updates. `deploy/azure/setup.sh`
+  now creates the environment with `--environment-mode ConsumptionOnly`, and replaces an express
+  environment left by an earlier run (its two apps are deleted and made again; the database is
+  not touched).
+- **Upgrade notes:** run `setup.sh` again in Cloud Shell, then re-run CI/CD on master. The web
+  address changes; the script prints the new one.
+
+### #16 Deploy re-applies the registry sign-in before pulling images (`fix/deploy-registry-auth`)
+- **Fixed:** the deploy failed with "Authentication failed when pulling container image" although
+  the previous rollout had pulled from the same registry. Before updating the images, the job now
+  sets both apps' registry user name and password again (taken from the registry itself).
+- **Changed:** the failure report shows each app's port, registries and secret names instead of
+  log lines, which express environments do not stream.
+
 ### #15 Deploy sets the app ports before the new images (`fix/deploy-ingress-order`)
 - **Fixed:** the first deploy to Azure failed at "Roll out the new images": the new API revision
   started while ingress still pointed at the placeholder's port 80, so it never became ready.

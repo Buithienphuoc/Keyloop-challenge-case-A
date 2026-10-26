@@ -201,6 +201,17 @@ jobs:
             [ "$(az containerapp show -g "$RESOURCE_GROUP" -n "$app" --query properties.configuration.ingress.targetPort -o tsv)" = "$port" ] ||
               az containerapp ingress update -g "$RESOURCE_GROUP" -n "$app" --target-port "$port" -o none
           done
+          # Give both apps the registry's sign-in again before pulling: Azure sometimes reports
+          # "Authentication failed when pulling" for an app whose stored credentials were fine
+          # on the previous rollout. Setting them is idempotent and keeps the app's other secrets.
+          acr="${REGISTRY%%.*}"
+          acr_user=$(az acr credential show -n "$acr" --query username -o tsv)
+          acr_password=$(az acr credential show -n "$acr" --query "passwords[0].value" -o tsv)
+          echo "::add-mask::$acr_password"
+          for app in scheduler-api scheduler-web; do
+            az containerapp registry set -g "$RESOURCE_GROUP" -n "$app" --server "$REGISTRY" \
+              --username "$acr_user" --password "$acr_password" --only-show-errors -o none
+          done
           # API first: the database migrates on its start-up, before the new web app needs it.
           az containerapp update -g "$RESOURCE_GROUP" -n scheduler-api \
             --image "$REGISTRY/service-scheduler-api:${{ github.sha }}" \
@@ -239,8 +250,9 @@ jobs:
             report=$( {
               az containerapp revision list -g "$RESOURCE_GROUP" -n "$app" \
                 --query "[].{revision:name, active:properties.active, health:properties.healthState, state:properties.runningState, image:properties.template.containers[0].image}" -o table
-              az containerapp logs show -g "$RESOURCE_GROUP" -n "$app" --type system --tail 20 --format text
-              az containerapp logs show -g "$RESOURCE_GROUP" -n "$app" --type console --tail 40 --format text
+              # Express environments have no log stream, so show the app's settings instead.
+              az containerapp show -g "$RESOURCE_GROUP" -n "$app" \
+                --query "{port:properties.configuration.ingress.targetPort, registries:properties.configuration.registries[].{server:server, username:username, secret:passwordSecretRef, identity:identity}, secrets:properties.configuration.secrets[].name, state:properties.provisioningState}" -o json
             } 2>&1 | tail -c 20000 || true)
             annotate "$app" "$report"
           done
