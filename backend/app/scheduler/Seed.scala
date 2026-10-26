@@ -109,6 +109,29 @@ object Seed:
   )
 
   /**
+   * prod: makes each account named in SEED_ACCOUNT_PASSWORDS use its configured password on every
+   * start, so new passwords take effect on the next rollout without a new database. An account
+   * whose password changes is signed out everywhere. Returns how many accounts changed.
+   */
+  def applyPasswords(db: Db, log: Log, passwords: Map[String, String]): Int =
+    def isHash(value: String) = value.startsWith("pbkdf2-sha512$")
+    val changed = db.tx { s =>
+      given Connection = Sql.connection(s)
+      passwords.toSeq.count { (email, password) =>
+        SQL"SELECT id::text AS id, password_hash FROM users WHERE lower(email) = $email"
+          .as((SqlParser.str("id") ~ SqlParser.str("password_hash")).singleOpt) match
+          case Some(id ~ stored) if !(if isHash(password) then password == stored else Passwords.verify(password, stored)) =>
+            val hash = if isHash(password) then password else Passwords.hash(password)
+            SQL"UPDATE users SET password_hash = $hash WHERE id = $id::uuid".executeUpdate()
+            SQL"UPDATE sessions SET revoked_at = now() WHERE user_id = $id::uuid AND revoked_at IS NULL".executeUpdate()
+            true
+          case _ => false
+      }
+    }
+    if changed > 0 then log.info("seed.passwords_changed", "accounts" -> changed)
+    changed
+
+  /**
    * Idempotent: loads the demo data only if no dealership exists, then adds the demo data of
    * later releases (new roles, parts) where it is missing, so an existing database is upgraded
    * too. Several API instances may start at once: an advisory lock lets one seed at a time.

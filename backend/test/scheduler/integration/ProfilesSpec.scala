@@ -7,6 +7,7 @@ import play.api.libs.json.*
 
 import scheduler.Seed
 import scheduler.modules.identity.Passwords
+import scheduler.shared.Log
 import scheduler.support.Harness
 
 /** The prod profile seeds the demo accounts with the configured passwords, never the public one. */
@@ -43,6 +44,16 @@ class ProfilesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
     it("locks the demo accounts that were given no password") {
       login("advisor.d1@demo.vn", Seed.DemoPassword) shouldBe 401
       login("parts.d1@demo.vn", Seed.DemoPassword) shouldBe 401
+    }
+
+    it("applies changed passwords to existing accounts and signs those accounts out") {
+      val oldSession = h.login("customer@demo.vn", CustomerPassword)
+      val rotated = Map("customer@demo.vn" -> Passwords.hash("Rotated-Pass-42"), "sysadmin@demo.vn" -> AdminPassword)
+      Seed.applyPasswords(h.components.db, Log.silent, rotated) shouldBe 1 // the admin's is unchanged
+      login("customer@demo.vn", CustomerPassword) shouldBe 401
+      login("customer@demo.vn", "Rotated-Pass-42") shouldBe 200
+      h.api("GET", "/api/auth/me", oldSession).status shouldBe 401
+      Seed.applyPasswords(h.components.db, Log.silent, rotated) shouldBe 0
     }
 
     it("still loads the rest of the demo data") {

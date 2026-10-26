@@ -80,8 +80,13 @@ The production passwords are made by `python3 deploy/azure/prod-accounts.py <fol
 writes the accounts with their passwords (`prod-accounts.txt`, keep it private) and the same list
 with only PBKDF2 hashes (`PROD_SEED_ACCOUNTS.secret.txt`). The hashes go into the GitHub secret
 `PROD_SEED_ACCOUNTS`; the deploy job hands them to the API, so no password is in the repository,
-the web app or the Azure configuration. The passwords apply when the accounts are created, on an
-empty database.
+the web app or the Azure configuration. Run the script on your own computer, so the plain
+passwords exist nowhere else.
+
+Changing the production passwords: run the script again, replace the `PROD_SEED_ACCOUNTS` secret
+with the new hash file, then run the CI/CD workflow on `master` (Actions → CI/CD → Run workflow).
+On start-up the prod API sets each listed account to its new password and signs it out everywhere;
+the old passwords stop working.
 
 ## Tests
 

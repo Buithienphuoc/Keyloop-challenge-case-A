@@ -64,6 +64,7 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
   val db: PgDb = PgDb(config.databaseUrl.orElse(embedded.map(_.jdbcUrl)).get, log, config.slowQueryMs, config.dbPoolSize)
   Migrations.run(db.dataSource, log)
   if config.seedDemoData then Seed.demoData(db, log, Seed.passwordsFor(config), clock())
+  if config.profile == Profile.Prod then Seed.applyPasswords(db, log, config.seedAccountPasswords)
   Metrics.registerJvmMetrics()
 
   // Every instance runs the sweeper; instances never wait on each other (see HoldSweeper).
