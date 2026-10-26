@@ -32,6 +32,13 @@ Severity: **M** = worth fixing before the demo, **L** = nice to have.
 | R12 | L | Readability | `reader.get(...).get` after every write (11 places in `application/`) | A bare `.get` hides the assumption "the row we just wrote exists". | A `reload(id)` helper per service that throws a clear internal error, or keep and comment once. |
 | R13 | M | SRP / readability (frontend) | `frontend/src/pages/customer/BookPage.tsx` (594 lines, 13 `useState`) | One component holds the four-step wizard, the hold timer, alternatives after a lost race and the confirmation screen. Hard to follow which state belongs to which step. | Split into `VehicleStep`, `ServiceStep`, `TimeStep`, `ConfirmStep` and drive the wizard with one `useReducer`. Same for `ResourcesPage.tsx` (451 lines), which already has sub-components and is fine to leave. |
 
+## Open questions (behaviour, not structure)
+
+| # | Where | Question | Options |
+| --- | --- | --- | --- |
+| Q1 | `domain/Lifecycle.scala` `checkTransition` | Staff can start (CONFIRMED → IN_PROGRESS) a job on any day, also days before the booking; the Selenium suite does this on purpose. The workshop day diagram assumes the vehicle is at the desk. | Keep, and the diagram says staff may start early (drawn so now); or refuse a start before the appointment's local day with `409 NOT_STARTED_YET`-style error (the e2e tests would then book for today). Owner's call. |
+| Q2 | `frontend/src/pages/customer/` advice request form | The dealership defaults to the first in the list, not the one the customer last booked at, so a request can go to the wrong workshop if the customer does not look. | Preselect the remembered dealership, as the booking page does. |
+
 ## Kept on purpose (agree with the first review)
 
 - Request shapes (play-json `Reads`) sit next to the use cases (`AdminRequests`, `PartsRequests`,

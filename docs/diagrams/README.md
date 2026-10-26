@@ -129,8 +129,14 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
    Added; the backend suite is now 95 tests (plus the 1000-request load test).
 2. **UC03, UC51, UC52 are partial** (see tables). Either build the missing edits or redraw these
    use cases with a narrower name before submission.
-3. Nothing in the code contradicts a drawn flow.
+3. **Starting a job is not tied to the date.** The workshop day diagram starts a job when the
+   vehicle has arrived, but the code only checks the transition and the role
+   (`Lifecycle.checkTransition` has time rules for no-show and customer cancels, none for
+   start), so staff can start a confirmed job days before it. The diagram now says so in a
+   note; whether the code should refuse is open (code review Q1). Found by the Selenium suite
+   (`docs/e2e-traceability.md`).
 4. **26 October 2026:** the diagrams were redrawn after the holds, workshop controller, parts,
    opening hours and package catalogue features (V2 migration). Use cases UC12, UC34, UC35, UC42,
-   UC53, UC62, UC70, UC71 were added; the state diagram now has HELD and EXPIRED. See
+   UC53, UC62, UC70, UC71 were added; the state diagram now has HELD and EXPIRED; moving a job
+   to another bay or technician is UC35 and the first step of the workshop day diagram. See
    `docs/code-review-2026-10-26.md`.
