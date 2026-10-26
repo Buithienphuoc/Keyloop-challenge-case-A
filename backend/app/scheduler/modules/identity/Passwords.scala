@@ -6,6 +6,8 @@ import java.util.{Base64, HexFormat}
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
+import scala.util.Try
+
 /**
  * Password hashing with PBKDF2-HMAC-SHA512 (in the JDK, no native library), a per-user random
  * salt and 210,000 iterations (the OWASP recommendation for this algorithm).
@@ -25,10 +27,12 @@ object Passwords:
     random.nextBytes(salt)
     s"$Scheme$$$Iterations$$${b64.encodeToString(salt)}$$${b64.encodeToString(derive(password, salt, Iterations))}"
 
+  /** False for a wrong password and for a stored value it cannot read (bad base64, zero cost), never an exception. */
   def verify(password: String, stored: String): Boolean = stored.split('$') match
-    case Array(Scheme, iterations, salt, expected) if iterations.toIntOption.isDefined =>
-      val actual = derive(password, unb64.decode(salt), iterations.toInt)
-      MessageDigest.isEqual(actual, unb64.decode(expected)) // constant time
+    case Array(Scheme, iterations, salt, expected) =>
+      iterations.toIntOption.filter(_ > 0).exists { n =>
+        Try(MessageDigest.isEqual(derive(password, unb64.decode(salt), n), unb64.decode(expected))).getOrElse(false) // constant time
+      }
     case _ => false
 
   private def derive(password: String, salt: Array[Byte], iterations: Int): Array[Byte] =
