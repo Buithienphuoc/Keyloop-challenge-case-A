@@ -91,11 +91,34 @@ package "Scheduling" {
     status : AppointmentStatus
     customerNote, cancelReason
     idempotencyKey <<unique per customer>>
+    holdExpiresAt (while HELD)
     createdAt, updatedAt
   }
   class AppointmentEvent <<audit>> {
     fromStatus, toStatus
     note, at
+  }
+}
+
+package "Parts" {
+  class Part {
+    sku <<unique per dealership>>
+    name, unitPrice, currency
+    stockQty >= 0
+    isActive
+  }
+  class PartOrder {
+    reference : "PO-XXXXXX"
+    status : PartOrderStatus
+    note
+    createdAt, updatedAt
+  }
+  class PartOrderLine {
+    quantity > 0
+    unitPrice
+  }
+  class PartOrderEvent <<audit>> {
+    fromStatus, toStatus, at
   }
 }
 
@@ -106,17 +129,21 @@ enum Role {
   TECHNICIAN
   ADMIN
   SYSTEM_MANAGER
+  WORKSHOP_CONTROLLER
+  PARTS_STAFF
 }
 enum VehicleType {
   MOTORBIKE
   CAR
 }
 enum AppointmentStatus {
+  HELD
   CONFIRMED
   IN_PROGRESS
   COMPLETED
   CANCELLED
   NO_SHOW
+  EXPIRED
 }
 enum ConsultationStatus {
   SUBMITTED
@@ -129,11 +156,19 @@ enum ConsultationKind {
   INSPECTION
   MODIFICATION
 }
+enum PartOrderStatus {
+  REQUESTED
+  ORDERED
+  RECEIVED
+  ISSUED
+  CANCELLED
+}
 }
 Role -[hidden]right- VehicleType
 VehicleType -[hidden]right- AppointmentStatus
 AppointmentStatus -[hidden]right- ConsultationStatus
 ConsultationStatus -[hidden]right- ConsultationKind
+ConsultationKind -[hidden]right- PartOrderStatus
 AppointmentEvent -[hidden]down- Role
 
 Dealership "1" *-- "0..*" ServiceBay
@@ -162,9 +197,17 @@ Appointment "0..1" --> "0..1" ConsultationRequest : live booking of
 Appointment "1" *-- "1..*" AppointmentEvent
 AppointmentEvent "0..*" --> "1" User : actor
 
+Dealership "1" *-- "0..*" Part
+PartOrder "0..*" --> "1" Dealership
+PartOrder "0..*" --> "0..1" Appointment : parts for >
+PartOrder "0..*" --> "1" User : requested by
+PartOrder "1" *-- "1..*" PartOrderLine
+PartOrderLine "0..*" --> "1" Part
+PartOrder "1" *-- "1..*" PartOrderEvent
+
 note bottom of Appointment
   Invariants enforced by PostgreSQL:
-  • no two CONFIRMED / IN_PROGRESS appointments overlap on the
+  • no two HELD / CONFIRMED / IN_PROGRESS appointments overlap on the
     same bay, the same technician or the same vehicle (EXCLUDE gist)
   • exactly one of servicePackage / consultationRequest
   • bay and technician belong to the appointment's dealership
@@ -172,7 +215,8 @@ note bottom of Appointment
 end note
 
 note bottom of User
-  SERVICE_ADVISOR, TECHNICIAN, ADMIN → exactly one dealership
+  SERVICE_ADVISOR, TECHNICIAN, ADMIN, WORKSHOP_CONTROLLER,
+  PARTS_STAFF → exactly one dealership
   CUSTOMER, SYSTEM_MANAGER → none
 end note
 

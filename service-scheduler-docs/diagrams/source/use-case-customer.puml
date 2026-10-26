@@ -17,6 +17,7 @@ rectangle "Unified Service Scheduler" {
   usecase "UC09 Cancel an appointment" as UC09
   usecase "UC10 Withdraw a request" as UC10
   usecase "UC11 Add an appointment\nto my calendar" as UC11
+  usecase "UC12 Hold a time for 10 minutes,\nthen confirm it" as UC12
 
   rectangle "Scheduling core" {
     usecase "UC20 Check real-time availability\n(bay of the right type AND\nqualified technician on shift)" as UC20
@@ -24,7 +25,6 @@ rectangle "Unified Service Scheduler" {
     usecase "UC22 Offer the nearest\nfree alternatives" as UC22
   }
 
-  usecase "Order replacement parts" as F01 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
   usecase "Reschedule an appointment" as F02 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
   usecase "Receive reminders\n(SMS / Zalo / email)" as F03 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
 }
@@ -40,10 +40,13 @@ Customer -- UC08
 Customer -- UC09
 Customer -- UC10
 Customer -- UC11
-Customer .. F01
 Customer .. F02
 Customer .. F03
 
+Customer -- UC12
+
+UC04 ..> UC12 : <<include>>
+UC07 ..> UC12 : <<include>>
 UC04 ..> UC20 : <<include>>
 UC04 ..> UC21 : <<include>>
 UC07 ..> UC20 : <<include>>
@@ -55,5 +58,6 @@ UC06 ..> UC07 : <<precedes>>
 
 legend bottom right
   Solid: implemented    Dashed grey: future work
+  Replacement parts are ordered by staff for a job (see the staff diagram).
 endlegend
 @enduml

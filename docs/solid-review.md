@@ -7,6 +7,12 @@ dependency rule is enforced by a test (`ArchitectureSpec`), not by review.
 
 File names below are the Scala ones (`backend/app/scheduler/...`).
 
+> **Follow-up, 26 October 2026:** the features added later (holds, workshop controller, parts,
+> opening hours, package catalogue, tracing) were reviewed again. The structure below still
+> holds; the smaller findings (duplicated helpers, two services that depend on the concrete
+> `IdentityService`, one long method, a two-way module dependency) are listed in
+> [`code-review-2026-10-26.md`](code-review-2026-10-26.md).
+
 ## What was wrong and what changed
 
 | # | Principle | Before | After |
@@ -25,7 +31,8 @@ File names below are the Scala ones (`backend/app/scheduler/...`).
 - **S**: one reason to change per unit. HTTP shape → a controller; a business rule → a service or
   `domain/`; a query → a `Pg*` adapter; wiring → `AppComponents`.
 - **O**: rules are data where they vary: state transitions and role permissions
-  (`domain/Lifecycle.scala`), start-time errors (`BookingService.StartErrors`), transition errors
+  (`domain/Lifecycle.scala`), parts order transitions and their stock effect
+  (`parts/Domain.scala`, `PartOrderLifecycle`), start-time errors (`BookingService.StartErrors`), transition errors
   (`AppointmentService.TransitionErrors`), bay compatibility (`domain/Compatibility.scala`).
 - **L**: any implementation of a port can replace another. `BookingServiceFakesSpec` runs
   `BookingService` on in-memory fakes, and the integration specs run it on PostgreSQL, with the
