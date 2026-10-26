@@ -36,11 +36,11 @@ final case class SessionInfo(token: String, expiresAt: Instant, user: PublicUser
 final case class CreateUser(email: String, password: String, fullName: String, phone: Option[String], role: Role, dealershipId: Option[String])
 
 /** Accounts and sessions. Persistence is behind UserRepository and SessionRepository. */
-final class IdentityService(db: Db, users: UserRepository, sessions: SessionRepository, sessionTtlHours: Double) extends Authenticator:
+final class IdentityService(db: Db, users: UserRepository, sessions: SessionRepository, sessionTtlHours: Double)
+    extends Authenticator, UserAccounts:
   import IdentityRequests.*
 
-  /** Creates an account; pass `s` to include it in your own transaction. 409 on a duplicate email. */
-  def createUser(input: CreateUser, s: Option[DbSession] = None): PublicUser =
+  def createUser(input: CreateUser, s: Option[DbSession]): PublicUser =
     val record = NewUserRecord(input.email.trim, Passwords.hash(input.password), input.fullName, input.phone, input.role, input.dealershipId)
     s match
       case Some(session) => users.insert(session, record)
@@ -80,6 +80,6 @@ final class IdentityService(db: Db, users: UserRepository, sessions: SessionRepo
   def authenticate(token: String): Option[AuthContext] = sessions.findCaller(Passwords.hashToken(token))
 
   def getUser(userId: String): PublicUser =
-    users.findById(userId).getOrElse(throw AppError.badRequest("USER_NOT_FOUND", "User no longer exists"))
+    users.findById(userId).getOrElse(throw AppError.notFound("User"))
 
   def listStaff(dealershipId: String): Seq[StaffMember] = users.listByDealership(dealershipId)

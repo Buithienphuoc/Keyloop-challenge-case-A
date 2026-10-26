@@ -6,7 +6,7 @@ import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 
 import scheduler.modules.identity.Role
-import scheduler.modules.identity.application.{CreateUser, IdentityRequests, IdentityService}
+import scheduler.modules.identity.application.{CreateUser, IdentityRequests, UserAccounts}
 import scheduler.modules.system.*
 import scheduler.shared.{AppError, Db, Log, Validate}
 
@@ -52,7 +52,7 @@ object NewDealership:
 final case class Onboarded(dealershipId: String, adminUserId: String)
 
 /** Platform-level administration: onboarding dealerships (tenants) and their first admin. */
-final class TenantService(db: Db, tenants: TenantRepository, identity: IdentityService):
+final class TenantService(db: Db, tenants: TenantRepository, identity: UserAccounts):
 
   def list(): Seq[DealershipSummary] = tenants.listWithCapacity()
 
