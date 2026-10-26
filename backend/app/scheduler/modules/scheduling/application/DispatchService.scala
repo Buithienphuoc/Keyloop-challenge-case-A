@@ -63,15 +63,19 @@ final class DispatchService(
       if bayId == job.bayId && technicianId == job.technicianId then
         throw AppError.unprocessable("NOTHING_TO_CHANGE", "The job already uses this bay and technician")
 
-      val bay = bays.find(_.id == bayId).getOrElse(throw AppError.unprocessable("UNKNOWN_BAY", "Not an active bay of your dealership"))
-      if bay.bayType != job.requirement.bayType then
-        throw AppError.unprocessable("BAY_TYPE_MISMATCH", s"This job needs a ${job.requirement.bayType} bay")
-      val tech = technicians.find(_.id == technicianId)
-        .getOrElse(throw AppError.unprocessable("UNKNOWN_TECHNICIAN", "Not an active technician of your dealership"))
-      if !tech.skills.contains(job.requirement.requiredSkill) then
-        throw AppError.unprocessable("TECHNICIAN_NOT_QUALIFIED", s"${tech.name} does not have the ${job.requirement.requiredSkill} skill")
-      if !Availability.isOnShift(tech, job.start.atZone(zone), job.end.atZone(zone)) then
-        throw AppError.unprocessable("TECHNICIAN_NOT_ON_SHIFT", s"${tech.name} is not working for the whole job")
+      // Only what changes is checked: moving the bay of a job whose technician has since been
+      // deactivated (or the reverse) must still work, so the unchanged side is left alone.
+      if bayId != job.bayId then
+        val bay = bays.find(_.id == bayId).getOrElse(throw AppError.unprocessable("UNKNOWN_BAY", "Not an active bay of your dealership"))
+        if bay.bayType != job.requirement.bayType then
+          throw AppError.unprocessable("BAY_TYPE_MISMATCH", s"This job needs a ${job.requirement.bayType} bay")
+      if technicianId != job.technicianId then
+        val tech = technicians.find(_.id == technicianId)
+          .getOrElse(throw AppError.unprocessable("UNKNOWN_TECHNICIAN", "Not an active technician of your dealership"))
+        if !tech.skills.contains(job.requirement.requiredSkill) then
+          throw AppError.unprocessable("TECHNICIAN_NOT_QUALIFIED", s"${tech.name} does not have the ${job.requirement.requiredSkill} skill")
+        if !Availability.isOnShift(tech, job.start.atZone(zone), job.end.atZone(zone)) then
+          throw AppError.unprocessable("TECHNICIAN_NOT_ON_SHIFT", s"${tech.name} is not working for the whole job")
 
       // A hold that ran out could still sit in the way: release it first.
       Holds.releaseExpired(s, writer, consultations, clock(), HoldScope.Around(dealershipId, None, job.start, job.end))
