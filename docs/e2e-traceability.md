@@ -38,9 +38,9 @@ two minutes). Against `npm run dev` instead: `BASE_URL=http://localhost:5173 sbt
 | UC60 Onboard a dealership | `AdminSpec` › onboards a dealership together with its first admin; its admin signs in |
 | UC61 Monitor dealerships | `AdminSpec` › sees its capacity: no bays, no technicians, nothing booked; `BackOfficeSpec` |
 | Admin generalises advisor | `WorkshopDaySpec` › the admin moves a job on the board; `AdminSpec` › an admin starts at the day board |
-| *Drawn as future, built:* re-plan bays and technicians | `BookingJourneySpec` › the workshop controller moves the job |
-| *Drawn as future, built:* fulfil parts orders | `BookingJourneySpec` › requests a part; restocks one unit, then issues the order |
-| *Drawn as future, built:* packages, opening hours | `BackOfficeSpec` › the package catalogue; saves the opening hours |
+| *Drawn as future before #3:* re-plan bays and technicians | `BookingJourneySpec` › the workshop controller moves the job |
+| *Drawn as future before #3:* fulfil parts orders | `BookingJourneySpec` › requests a part; restocks one unit, then issues the order |
+| *Drawn as future before #3:* packages, opening hours | `BackOfficeSpec` › the package catalogue; saves the opening hours |
 
 ## Activity diagram branches
 
@@ -70,38 +70,22 @@ Not reachable from a browser and left to the backend suite: the hold timing out 
 minutes, a technician moving someone else's job (the page never offers it, `ApiSpec` checks the
 403), and the five-attempt retry inside one booking.
 
-## Where the code and the diagrams disagree
+## Where the code and the diagrams disagreed
 
-Found while writing the tests above. The code is the newer side in every case; nothing here is
-a bug in a drawn flow, but the diagrams and the SRS describe an older version.
+Found while writing the tests above, against the diagrams as they were before #3. #3 redrew
+the diagrams and updated the SRS; what is left open is listed in
+[docs/diagrams/README.md](diagrams/README.md#gaps-found-while-tracing).
 
-1. **The hold step is missing from the diagrams.** Since the "scalable extras" release, pressing
-   *Hold this time and review* creates a `HELD` appointment for 10 minutes (`POST
-   /api/appointments/holds`), and *Confirm booking* turns it into `CONFIRMED` (`POST
-   /api/appointments/:id/confirm`). `activity-book-package.puml` still goes straight from
-   *Confirm booking* to `POST /api/appointments`, so the race and the alternatives (UC22) now
-   happen at the hold, not at the confirmation. `state-appointment.puml` has no `HELD` or
-   `EXPIRED` state, and its note says only `CONFIRMED` and `IN_PROGRESS` hold a bay, while a
-   hold takes the bay, technician and vehicle too (`BookingService.book`, `Lifecycle.scala`).
-   The SRS (section 12) still lists the hold as future work.
-2. **Built features are still drawn as future work.** In `use-case-staff.puml` the workshop
-   controller and parts staff actors, *Re-plan bays and technicians*, *Fulfil parts orders*,
-   *Manage service packages and prices* and *Edit opening hours* are dashed grey, and the
-   traceability table in `docs/diagrams/README.md` and SRS sections 2.2 and 12 call them
-   future. All of them have pages, routes and e2e tests. (*Breaks and holidays* in F12 really
-   are not built.) The customer's dashed *Order replacement parts* is still accurate: only
-   staff raise parts orders.
-3. **"Has the vehicle arrived?" is not checked against the date.** The workshop day diagram
-   starts a job when the vehicle is at the desk, but the board and My jobs offer *start* for
-   any confirmed job, on any day: `WorkshopDaySpec` starts and finishes jobs booked five days
-   ahead. `Lifecycle.checkTransition` has a time rule for no-show and for customer cancels,
-   none for starting. Either the diagram notes that staff may start early, or the code refuses
-   to start before the appointment's day (my recommendation: refuse, with a clear 409).
-4. **Moving a job is in no diagram.** The workshop controller and the dealership admin can
-   move a confirmed job to another bay or technician (`POST /api/appointments/:id/reassign`);
-   the workshop day diagram does not show it.
-5. **The "Gaps found while tracing" list in `docs/diagrams/README.md` is out of date**: it says
-   nothing in the code contradicts a drawn flow, which points 1–4 now do.
+1. **The hold step was missing** from the booking activity and the state diagram (HELD and
+   EXPIRED). Fixed in #3.
+2. **Built features were drawn as future work** (workshop controller, parts staff, re-plan,
+   parts orders, packages, opening hours). Fixed in #3.
+3. **"Has the vehicle arrived?" is not checked against the date.** Staff can start a job on any
+   day ahead (`WorkshopDaySpec` starts and finishes jobs booked five days out). Still open:
+   #3 notes it on the diagram, and whether the code should refuse is question Q1 in
+   `docs/code-review-2026-10-26.md`.
+4. **Moving a job was in no diagram.** Fixed in #3 (UC35).
+5. **The diagrams README said nothing contradicts a drawn flow.** Fixed in #3.
 
 One small usability point found on the way, not a diagram mismatch: the advice request form
 preselects the first dealership in the list (Riverside, Thu Duc), not the one the customer last
