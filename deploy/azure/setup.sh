@@ -26,9 +26,20 @@ PG_VERSION="${PG_VERSION:-16}"
 STATE="$HOME/.service-scheduler-azure.env"
 # shellcheck disable=SC1090
 [ -f "$STATE" ] && source "$STATE"
-SUFFIX="${SUFFIX:-$(openssl rand -hex 3)}"
-# Hex plus a capital letter meets PostgreSQL's complexity rule and needs no URL escaping.
-DB_PASSWORD="${DB_PASSWORD:-Pg$(openssl rand -hex 16)}"
+# Cloud Shell may be ephemeral (no home folder kept between sessions), so the state file can be
+# gone on a re-run. The suffix is then recovered from the registry already in the resource group,
+# and a new database password is generated and applied to the existing server and API (below).
+if [ -z "${SUFFIX:-}" ]; then
+  existing=$(az acr list -g "$RG" --query "[?starts_with(name, 'scheduler')].name | [0]" -o tsv 2>/dev/null || true)
+  SUFFIX="${existing#scheduler}"
+  [ -n "$SUFFIX" ] || SUFFIX=$(openssl rand -hex 3)
+fi
+NEW_PASSWORD=false
+if [ -z "${DB_PASSWORD:-}" ]; then
+  # Hex plus a capital letter meets PostgreSQL's complexity rule and needs no URL escaping.
+  DB_PASSWORD="Pg$(openssl rand -hex 16)"
+  NEW_PASSWORD=true
+fi
 APP_SECRET="${APP_SECRET:-$(openssl rand -hex 32)}"
 printf 'SUFFIX=%s\nDB_PASSWORD=%s\nAPP_SECRET=%s\n' "$SUFFIX" "$DB_PASSWORD" "$APP_SECRET" > "$STATE"
 chmod 600 "$STATE"
@@ -61,8 +72,15 @@ if ! exists az postgres flexible-server show -g "$RG" -n "$PG"; then
   az postgres flexible-server create -g "$RG" -n "$PG" -l "$LOCATION" \
     --tier Burstable --sku-name Standard_B1ms --storage-size 32 --version "$PG_VERSION" \
     --admin-user scheduler --admin-password "$DB_PASSWORD" \
-    --database-name scheduler --public-access 0.0.0.0 --yes -o none
+    --public-access 0.0.0.0 --yes -o none
+elif [ "$NEW_PASSWORD" = true ]; then
+  echo "    (no saved password from an earlier run: setting a new one)"
+  az postgres flexible-server update -g "$RG" -n "$PG" --admin-password "$DB_PASSWORD" -o none
 fi
+# Newer Azure CLI versions only accept --database-name for elastic clusters, so the database is
+# created on its own.
+exists az postgres flexible-server db show -g "$RG" -s "$PG" -n scheduler ||
+  az postgres flexible-server db create -g "$RG" -s "$PG" -n scheduler -o none
 # The schema uses btree_gist for its no-double-booking constraints; Azure needs it allow-listed.
 az postgres flexible-server parameter set -g "$RG" -s "$PG" --name azure.extensions --value BTREE_GIST,PGCRYPTO -o none
 DATABASE_URL="jdbc:postgresql://${PG}.postgres.database.azure.com:5432/scheduler?user=scheduler&password=${DB_PASSWORD}&sslmode=require"
@@ -81,6 +99,11 @@ if ! exists az containerapp show -g "$RG" -n scheduler-api; then
     --secrets "database-url=$DATABASE_URL" "app-secret=$APP_SECRET" \
     --env-vars DATABASE_URL=secretref:database-url APPLICATION_SECRET=secretref:app-secret DB_POOL_SIZE=8 LOG_FORMAT=json \
     -o none
+elif [ "$NEW_PASSWORD" = true ]; then
+  # The database password was just reset: give the API the new connection string and restart it.
+  az containerapp secret set -g "$RG" -n scheduler-api --secrets "database-url=$DATABASE_URL" "app-secret=$APP_SECRET" -o none
+  az containerapp revision restart -g "$RG" -n scheduler-api \
+    --revision "$(az containerapp show -g "$RG" -n scheduler-api --query properties.latestRevisionName -o tsv)" -o none
 fi
 
 step "Web app scheduler-web (public HTTPS)"

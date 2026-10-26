@@ -13,6 +13,13 @@ Entry format:
 
 ## Unreleased
 
+### #11 Azure setup works with the current Azure CLI (`fix/azure-setup-cli`)
+- **Fixed:** `deploy/azure/setup.sh` no longer stops at PostgreSQL ("--database-name ... only
+  applies to elastic clusters"); the `scheduler` database is created with its own command.
+- **Fixed:** re-running the script in an ephemeral Cloud Shell reuses the existing resources
+  instead of creating a second set, and applies a fresh database password to the server and API.
+- **Upgrade notes:** if a run stopped at the PostgreSQL step, run the script again.
+
 ### #9 Patch notes moved to their merge date (`docs/patch-notes-2026-10-26`)
 - **Docs:** the entries for #3–#8 and #10 move from Unreleased to 26 October 2026, the day they merged.
 
