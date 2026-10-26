@@ -8,7 +8,7 @@
 <polygon points="1423.2,1000.0 1250.0,1100.0 1076.8,1000.0 1076.8,800.0 1250.0,700.0 1423.2,800.0" fill="#1D4E89" stroke="#1F2A30" stroke-width="2.5" />
 <text x="1250" y="330" font-size="18" font-weight="700" fill="#56636B" text-anchor="middle">ADAPTERS</text>
 <text x="1250" y="354" font-size="13" font-weight="400" fill="#56636B" text-anchor="middle">modules/*/adapters/*Controller.scala (driving) · modules/*/adapters/Pg*.scala (driven) · shared/</text>
-<text x="1250" y="535" font-size="15" font-weight="700" fill="#1D4E89" text-anchor="middle">APPLICATION  (use cases: modules/*/application/)</text>
+<text x="1250" y="518" font-size="15" font-weight="700" fill="#1D4E89" text-anchor="middle">APPLICATION  (use cases: modules/*/application/)</text>
 <text x="1250" y="790" font-size="20" font-weight="700" fill="#fff" text-anchor="middle">DOMAIN</text>
 <text x="1250" y="812" font-size="13" font-weight="400" fill="#DCE6F2" text-anchor="middle" font-style="italic">pure, no I/O</text>
 <text x="1250" y="850" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Availability.scala</text>
@@ -19,144 +19,165 @@
 <text x="1250" y="947" font-size="11" font-weight="400" fill="#DCE6F2" text-anchor="middle">bay type ↔ vehicle, values</text>
 <text x="1250" y="970" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">&lt;module&gt;/Domain.scala</text>
 <text x="1250" y="987" font-size="11" font-weight="400" fill="#DCE6F2" text-anchor="middle">catalog, vehicles, consultation, identity</text>
-<rect x="1000.0" y="622.0" width="160" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1080" y="643" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">AvailabilityService</text>
-<rect x="1170.0" y="622.0" width="160" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1250" y="643" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">BookingService</text>
-<rect x="1340.0" y="622.0" width="160" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1420" y="643" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">AppointmentService</text>
-<rect x="1140.0" y="566.0" width="220" height="44" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1250" y="585" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">WorkshopContext</text>
-<text x="1250" y="602" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">shared rules: requirement, dealership</text>
-<rect x="1000.0" y="1146.0" width="160" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1080" y="1167" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">ConsultationService</text>
-<rect x="1170.0" y="1146.0" width="160" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1250" y="1167" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">VehicleService</text>
-<rect x="1340.0" y="1146.0" width="160" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1420" y="1167" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">IdentityService</text>
-<rect x="1075.0" y="1194.0" width="170" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1160" y="1215" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">WorkshopAdminService</text>
-<rect x="1255.0" y="1194.0" width="170" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1340" y="1215" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">TenantService</text>
-<line x1="1250" y1="655" x2="1250" y2="697" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="1250" y1="1145" x2="1250" y2="1103" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="955.0" y="604.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1025" y="625" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">AvailabilityService</text>
+<rect x="1105.0" y="604.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1175" y="625" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">BookingService</text>
+<rect x="1255.0" y="604.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1325" y="625" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">AppointmentService</text>
+<rect x="1405.0" y="604.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1475" y="625" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">DispatchService</text>
+<rect x="1080.0" y="546.0" width="220" height="44" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1190" y="565" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">WorkshopContext</text>
+<text x="1190" y="582" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">shared rules: requirement, dealership</text>
+<rect x="1305.0" y="546.0" width="150" height="44" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1380" y="565" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">HoldSweeper</text>
+<text x="1380" y="582" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">releases lapsed holds</text>
+<rect x="955.0" y="1164.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1025" y="1185" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">ConsultationService</text>
+<rect x="1105.0" y="1164.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1175" y="1185" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">VehicleService</text>
+<rect x="1255.0" y="1164.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1325" y="1185" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">IdentityService</text>
+<rect x="1405.0" y="1164.0" width="140" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1475" y="1185" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">PartsService</text>
+<rect x="1015.0" y="1214.0" width="150" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1090" y="1235" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">WorkshopAdminService</text>
+<rect x="1175.0" y="1214.0" width="150" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1250" y="1235" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">TenantService</text>
+<rect x="1335.0" y="1214.0" width="150" height="32" rx="7" fill="#fff" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1410" y="1235" font-size="12" font-weight="700" fill="#1D4E89" text-anchor="middle">PackageAdminService</text>
+<line x1="1250" y1="636" x2="1250" y2="697" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="1250" y1="1164" x2="1250" y2="1103" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
 <rect x="812.9680602213139" y="655" width="60" height="490" rx="5" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
 <text transform="translate(839.9680602213139,900) rotate(-90)" font-size="16" font-weight="700" fill="#1F2A30" text-anchor="middle">Use-case API</text>
 <text transform="translate(857.9680602213139,900) rotate(-90)" font-size="11" fill="#1F2A30" text-anchor="middle">service methods + AuthContext (validated input)</text>
-<rect x="536.5738685968815" y="658.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="677" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">SchedulingController</text>
-<text x="641.5738685968815" y="694" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">availability, book, status</text>
-<line x1="746.5738685968815" y1="680" x2="810.9680602213139" y2="680" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="713.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="732" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">ConsultationController</text>
-<text x="641.5738685968815" y="749" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">requests, advisor queue</text>
-<line x1="746.5738685968815" y1="735" x2="810.9680602213139" y2="735" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="768.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="787" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">IdentityController</text>
-<text x="641.5738685968815" y="804" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">register, login, logout</text>
-<line x1="746.5738685968815" y1="790" x2="810.9680602213139" y2="790" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="823.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="842" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">Guard (auth)</text>
-<text x="641.5738685968815" y="859" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">Authenticator port, roles</text>
-<line x1="746.5738685968815" y1="845" x2="810.9680602213139" y2="845" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="878.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="897" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">VehicleController</text>
-<text x="641.5738685968815" y="914" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">my vehicles</text>
-<line x1="746.5738685968815" y1="900" x2="810.9680602213139" y2="900" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="933.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="952" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">AdminController</text>
-<text x="641.5738685968815" y="969" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">bays, technicians, staff</text>
-<line x1="746.5738685968815" y1="955" x2="810.9680602213139" y2="955" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="988.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="1007" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">SystemController</text>
-<text x="641.5738685968815" y="1024" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">onboard dealerships</text>
-<line x1="746.5738685968815" y1="1010" x2="810.9680602213139" y2="1010" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="1043.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="1062" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">CatalogController</text>
-<text x="641.5738685968815" y="1079" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">dealerships, packages</text>
-<line x1="746.5738685968815" y1="1065" x2="810.9680602213139" y2="1065" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="536.5738685968815" y="1098.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="641.5738685968815" y="1117" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">/metrics · /health</text>
-<text x="641.5738685968815" y="1134" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">Prometheus client, DB ping</text>
-<rect x="1542.0319397786861" y="660" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="677" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">ResourceCalendar</text>
-<text x="1657.0319397786861" y="693" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">AppointmentReader · AppointmentWriter</text>
-<rect x="1783.4261314031185" y="658.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="677" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgSchedulingStore</text>
-<text x="1898.4261314031185" y="694" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">EXCLUDE errors → SlotTaken</text>
-<line x1="1783.4261314031185" y1="680" x2="1774.0319397786861" y2="680" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="715" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="732" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">ConsultationBookingPort</text>
-<text x="1657.0319397786861" y="748" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">declared by scheduling</text>
-<rect x="1783.4261314031185" y="713.0" width="230" height="44" rx="7" fill="#E4ECF5" stroke="#1D4E89" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="732" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">ConsultationService</text>
-<text x="1898.4261314031185" y="749" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">in-process, no SQL</text>
-<line x1="1783.4261314031185" y1="735" x2="1774.0319397786861" y2="735" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="770" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="787" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">CatalogReader</text>
-<text x="1657.0319397786861" y="803" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">dealerships, packages, skills</text>
-<rect x="1783.4261314031185" y="774.0" width="230" height="32" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="795" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgCatalogRepo</text>
-<line x1="1783.4261314031185" y1="790" x2="1774.0319397786861" y2="790" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="825" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="842" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">VehicleRepository</text>
-<text x="1657.0319397786861" y="858" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">OwnedVehicles for others</text>
-<rect x="1783.4261314031185" y="829.0" width="230" height="32" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="850" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgVehicleRepo</text>
-<line x1="1783.4261314031185" y1="845" x2="1774.0319397786861" y2="845" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="880" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="897" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">ConsultationRepository</text>
-<text x="1657.0319397786861" y="913" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle"> </text>
-<rect x="1783.4261314031185" y="884.0" width="230" height="32" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="905" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgConsultationRepo</text>
-<line x1="1783.4261314031185" y1="900" x2="1774.0319397786861" y2="900" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="935" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="952" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">UserRepository</text>
-<text x="1657.0319397786861" y="968" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">SessionRepository</text>
-<rect x="1783.4261314031185" y="933.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="952" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgIdentityRepo</text>
-<text x="1898.4261314031185" y="969" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">one class, two ports</text>
-<line x1="1783.4261314031185" y1="955" x2="1774.0319397786861" y2="955" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="990" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="1007" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">WorkshopRepository</text>
-<text x="1657.0319397786861" y="1023" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">TenantRepository</text>
-<rect x="1783.4261314031185" y="994.0" width="230" height="32" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="1015" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgWorkshopRepo · PgTenantRepo</text>
-<line x1="1783.4261314031185" y1="1010" x2="1774.0319397786861" y2="1010" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="1045" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="1062" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">Db (unit of work)</text>
-<text x="1657.0319397786861" y="1078" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">run, tx → TransientStorageError</text>
-<rect x="1783.4261314031185" y="1043.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="1062" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgDb (HikariCP)</text>
-<text x="1898.4261314031185" y="1079" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">slow-query log, metrics</text>
-<line x1="1783.4261314031185" y1="1065" x2="1774.0319397786861" y2="1065" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<rect x="1542.0319397786861" y="1100" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1657.0319397786861" y="1117" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">Clock · Log</text>
-<text x="1657.0319397786861" y="1133" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">() =&gt; Instant, Log</text>
-<rect x="1783.4261314031185" y="1098.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
-<text x="1898.4261314031185" y="1117" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">Instant.now · Logback JSON</text>
-<text x="1898.4261314031185" y="1134" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">TestClock in tests</text>
-<line x1="1783.4261314031185" y1="1120" x2="1774.0319397786861" y2="1120" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="653.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="672" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">SchedulingController</text>
+<text x="641.5738685968815" y="689" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">availability, hold, book, move</text>
+<line x1="746.5738685968815" y1="675" x2="810.9680602213139" y2="675" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="703.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="722" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">ConsultationController</text>
+<text x="641.5738685968815" y="739" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">requests, advisor queue</text>
+<line x1="746.5738685968815" y1="725" x2="810.9680602213139" y2="725" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="753.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="772" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">IdentityController</text>
+<text x="641.5738685968815" y="789" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">register, login, logout</text>
+<line x1="746.5738685968815" y1="775" x2="810.9680602213139" y2="775" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="803.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="822" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">Guard (auth)</text>
+<text x="641.5738685968815" y="839" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">Authenticator port, roles</text>
+<line x1="746.5738685968815" y1="825" x2="810.9680602213139" y2="825" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="853.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="872" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">VehicleController</text>
+<text x="641.5738685968815" y="889" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">my vehicles</text>
+<line x1="746.5738685968815" y1="875" x2="810.9680602213139" y2="875" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="903.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="922" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">AdminController</text>
+<text x="641.5738685968815" y="939" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">bays, technicians, staff, hours</text>
+<line x1="746.5738685968815" y1="925" x2="810.9680602213139" y2="925" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="953.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="972" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">SystemController</text>
+<text x="641.5738685968815" y="989" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">onboard dealerships, packages</text>
+<line x1="746.5738685968815" y1="975" x2="810.9680602213139" y2="975" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="1003.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="1022" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">CatalogController</text>
+<text x="641.5738685968815" y="1039" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">dealerships, packages</text>
+<line x1="746.5738685968815" y1="1025" x2="810.9680602213139" y2="1025" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="1053.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="1072" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">PartsController</text>
+<text x="641.5738685968815" y="1089" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">stock, parts orders</text>
+<line x1="746.5738685968815" y1="1075" x2="810.9680602213139" y2="1075" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="536.5738685968815" y="1103.0" width="210" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="641.5738685968815" y="1122" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">/metrics · /health</text>
+<text x="641.5738685968815" y="1139" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">Prometheus client, DB ping</text>
+<rect x="1542.0319397786861" y="655" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="672" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">ResourceCalendar</text>
+<text x="1657.0319397786861" y="688" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">AppointmentReader · AppointmentWriter</text>
+<rect x="1783.4261314031185" y="653.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="672" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgSchedulingStore</text>
+<text x="1898.4261314031185" y="689" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">EXCLUDE errors → SlotTaken</text>
+<line x1="1783.4261314031185" y1="675" x2="1774.0319397786861" y2="675" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="705" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="722" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">ConsultationBookingPort</text>
+<text x="1657.0319397786861" y="738" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">declared by scheduling</text>
+<rect x="1783.4261314031185" y="703.0" width="230" height="44" rx="7" fill="#E4ECF5" stroke="#1D4E89" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="722" font-size="13" font-weight="700" fill="#1D4E89" text-anchor="middle">ConsultationService</text>
+<text x="1898.4261314031185" y="739" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">in-process, no SQL</text>
+<line x1="1783.4261314031185" y1="725" x2="1774.0319397786861" y2="725" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="755" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="772" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">CatalogReader</text>
+<text x="1657.0319397786861" y="788" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">dealerships, packages, skills</text>
+<rect x="1783.4261314031185" y="759.0" width="230" height="32" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="780" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgCatalogRepo</text>
+<line x1="1783.4261314031185" y1="775" x2="1774.0319397786861" y2="775" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="805" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="822" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">VehicleRepository</text>
+<text x="1657.0319397786861" y="838" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">OwnedVehicles for others</text>
+<rect x="1783.4261314031185" y="809.0" width="230" height="32" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="830" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgVehicleRepo</text>
+<line x1="1783.4261314031185" y1="825" x2="1774.0319397786861" y2="825" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="855" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="872" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">ConsultationRepository</text>
+<text x="1657.0319397786861" y="888" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle"> </text>
+<rect x="1783.4261314031185" y="859.0" width="230" height="32" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="880" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgConsultationRepo</text>
+<line x1="1783.4261314031185" y1="875" x2="1774.0319397786861" y2="875" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="905" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="922" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">UserRepository</text>
+<text x="1657.0319397786861" y="938" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">SessionRepository</text>
+<rect x="1783.4261314031185" y="903.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="922" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgIdentityRepo</text>
+<text x="1898.4261314031185" y="939" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">one class, two ports</text>
+<line x1="1783.4261314031185" y1="925" x2="1774.0319397786861" y2="925" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="955" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="972" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">WorkshopRepository</text>
+<text x="1657.0319397786861" y="988" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">TenantRepository · PackageRepository</text>
+<rect x="1783.4261314031185" y="953.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="972" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgWorkshopRepo · PgTenantRepo</text>
+<text x="1898.4261314031185" y="989" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">PgPackageRepo</text>
+<line x1="1783.4261314031185" y1="975" x2="1774.0319397786861" y2="975" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="1005" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="1022" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">PartsRepository</text>
+<text x="1657.0319397786861" y="1038" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">stock never below zero</text>
+<rect x="1783.4261314031185" y="1003.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="1022" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgPartsRepo</text>
+<text x="1898.4261314031185" y="1039" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">CHECK violation → OutOfStock</text>
+<line x1="1783.4261314031185" y1="1025" x2="1774.0319397786861" y2="1025" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="1055" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="1072" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">Db (unit of work)</text>
+<text x="1657.0319397786861" y="1088" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">run, tx → TransientStorageError</text>
+<rect x="1783.4261314031185" y="1053.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="1072" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">PgDb (HikariCP)</text>
+<text x="1898.4261314031185" y="1089" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">slow-query log, metrics</text>
+<line x1="1783.4261314031185" y1="1075" x2="1774.0319397786861" y2="1075" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="1542.0319397786861" y="1105" width="230" height="40" rx="4" fill="#F2C230" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1657.0319397786861" y="1122" font-size="12" font-weight="700" fill="#1F2A30" text-anchor="middle">Clock · Log · Tracing</text>
+<text x="1657.0319397786861" y="1138" font-size="10" font-weight="400" fill="#1F2A30" text-anchor="middle">() =&gt; Instant, Log, spans</text>
+<rect x="1783.4261314031185" y="1103.0" width="230" height="44" rx="7" fill="#fff" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="1898.4261314031185" y="1122" font-size="13" font-weight="700" fill="#1F2A30" text-anchor="middle">Logback JSON · OpenTelemetry</text>
+<text x="1898.4261314031185" y="1139" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">TestClock in tests</text>
+<line x1="1783.4261314031185" y1="1125" x2="1774.0319397786861" y2="1125" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
 <rect x="50.0" y="658.0" width="230" height="44" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
 <text x="165" y="677" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">React SPA</text>
 <text x="165" y="694" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">Bearer, Idempotency-Key</text>
-<line x1="280" y1="680" x2="534.5738685968815" y2="680" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="280" y1="680" x2="534.5738685968815" y2="675" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
 <rect x="50.0" y="768.0" width="230" height="44" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
 <text x="165" y="787" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">Swagger UI</text>
 <text x="165" y="804" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">/docs, openapi.yaml</text>
-<line x1="280" y1="790" x2="534.5738685968815" y2="790" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="280" y1="790" x2="534.5738685968815" y2="775" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
 <rect x="50.0" y="878.0" width="230" height="44" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
 <text x="165" y="897" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">ScalaTest API tests</text>
 <text x="165" y="914" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">in-process requests, real PostgreSQL</text>
-<line x1="280" y1="900" x2="534.5738685968815" y2="900" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="280" y1="900" x2="534.5738685968815" y2="875" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
 <rect x="50.0" y="1098.0" width="230" height="44" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
 <text x="165" y="1117" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">Prometheus</text>
 <text x="165" y="1134" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">scrapes /metrics</text>
-<line x1="280" y1="1120" x2="534.5738685968815" y2="1120" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="280" y1="1120" x2="534.5738685968815" y2="1125" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
 <rect x="50.0" y="1298.0" width="230" height="44" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
 <text x="165" y="1317" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">Unit tests on fakes</text>
 <text x="165" y="1334" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">BookingServiceFakesSpec, domain, props</text>
-<path d="M280,1320 C 730,1420 950,1320 1000,1190" fill="none" stroke="#1F2A30" stroke-width="1.8" stroke-dasharray="3 5" marker-end="url(#ink)"/>
+<path d="M280,1320 C 730,1420 950,1320 1025,1198" fill="none" stroke="#1F2A30" stroke-width="1.8" stroke-dasharray="3 5" marker-end="url(#ink)"/>
 <text x="690" y="1405" font-size="12" font-weight="400" fill="#56636B" text-anchor="middle">services with in-memory ports, domain functions directly</text>
 <rect x="2235.0" y="810.0" width="230" height="60" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
 <text x="2350" y="837" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">PostgreSQL</text>
@@ -164,14 +185,19 @@
 <rect x="2235.0" y="1098.0" width="230" height="44" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
 <text x="2350" y="1117" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">stdout</text>
 <text x="2350" y="1134" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">JSON lines → log store</text>
-<line x1="2013.4261314031185" y1="680" x2="2233" y2="821.6666666666666" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="2013.4261314031185" y1="790" x2="2233" y2="830.8333333333334" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="2013.4261314031185" y1="845" x2="2233" y2="835.4166666666666" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="2013.4261314031185" y1="900" x2="2233" y2="840.0" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="2013.4261314031185" y1="955" x2="2233" y2="844.5833333333334" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="2013.4261314031185" y1="1010" x2="2233" y2="849.1666666666666" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="2013.4261314031185" y1="1065" x2="2233" y2="853.75" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
-<line x1="2013.4261314031185" y1="1120" x2="2233" y2="1120" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<rect x="2235.0" y="1208.0" width="230" height="44" rx="7" fill="#F3F5F4" stroke="#1F2A30" stroke-width="1.5"/>
+<text x="2350" y="1227" font-size="14" font-weight="700" fill="#1F2A30" text-anchor="middle">Jaeger (OTLP)</text>
+<text x="2350" y="1244" font-size="11" font-weight="400" fill="#56636B" text-anchor="middle">request, booking and SQL spans</text>
+<line x1="2013.4261314031185" y1="1125" x2="2233" y2="1230" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="675" x2="2233" y2="821.25" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="775" x2="2233" y2="829.5833333333334" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="825" x2="2233" y2="833.75" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="875" x2="2233" y2="837.9166666666666" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="925" x2="2233" y2="842.0833333333334" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="975" x2="2233" y2="846.25" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="1025" x2="2233" y2="850.4166666666666" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="1075" x2="2233" y2="854.5833333333334" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
+<line x1="2013.4261314031185" y1="1125" x2="2233" y2="1120" stroke="#1F2A30" stroke-width="1.8" marker-end="url(#ink)"/>
 <rect x="80" y="1730" width="2340" height="170" rx="10" fill="#F1F8F3" stroke="#2E7D4F" stroke-width="1.2"/>
 <text x="110" y="1762" font-size="16" font-weight="700" fill="#2E7D4F" text-anchor="start">Enforced, not just drawn: ArchitectureSpec fails if a domain, application or port file imports an adapter, the HTTP layer, play.api.mvc, Anorm, JDBC or SQL helpers.</text>
 <text x="110" y="1794" font-size="14" font-weight="400" fill="#1F2A30" text-anchor="start">Database outcomes are translated at the edge: EXCLUDE violations → SlotTakenError / VehicleBusyError (PgSchedulingStore), deadlocks → TransientStorageError (Db.tx). No SQL code reaches a use case.</text>

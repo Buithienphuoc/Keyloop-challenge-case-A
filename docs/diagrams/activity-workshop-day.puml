@@ -1,21 +1,46 @@
 @startuml activity-workshop-day
 !include _style.iuml
-title Activity — the workshop day (UC30, UC32, UC33, UC40, UC41)
+title Activity — the workshop day (UC30, UC32–UC35, UC40–UC42)
 
+|Workshop controller|
 |Service advisor|
 |Technician|
 |System|
-|Service advisor|
+|Workshop controller|
 start
+:Open the day's workload
+(booked minutes per bay and technician);
+if (A technician is off or a bay is down?) then (yes)
+  :Move the affected jobs to another bay
+  or technician, with a reason;
+  |System|
+  :Check the bay or technician that changes: active,
+  right bay type, has the skill, on shift for the whole
+  job; EXCLUDE has the last word
+  (busy → 409 RESOURCE_BUSY); audit row "Moved: …";
+else (no)
+endif
+|Service advisor|
 :Open the workshop day board
 (bays as rows, jobs placed by time);
 :Select a booking;
+note left
+  "Has the vehicle arrived?" is the advisor's call
+  at the desk. The system does not check the date:
+  a CONFIRMED job can be started on any day, also
+  before the booked one (open question, code review Q1).
+end note
 if (Has the vehicle arrived?) then (yes)
   :Hand the vehicle to the
   assigned technician;
   |Technician|
   :Open "My jobs", read the service,
   the checklist and the customer's note;
+  if (Parts needed?) then (yes)
+    :Order parts for the job
+    (parts staff order, receive and issue them);
+  else (no)
+  endif
   :Start job;
   note right: The advisor can also start it from the board.
   |System|

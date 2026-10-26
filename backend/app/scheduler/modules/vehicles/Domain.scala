@@ -36,11 +36,19 @@ object NewVehicle:
     case _ => JsError(Validate.error("A VIN has 17 characters and never uses I, O or Q"))
   }
 
+  /**
+   * Model years from 1950 to next year (next year's models go on sale early). The limit is
+   * worked out on every read, not once at start-up, so a server running past New Year accepts
+   * the new year's models.
+   */
+  private[vehicles] def modelYear(thisYear: () => Year): Reads[Int] =
+    Reads(js => Validate.int(1950, thisYear().getValue + 1).reads(js))
+
   given Reads[NewVehicle] = (
     (__ \ "vehicleType").read(Validate.oneOf(VehicleType.values)) and
       (__ \ "make").read(Validate.text(1, 60)) and
       (__ \ "model").read(Validate.text(1, 60)) and
-      (__ \ "year").readNullable(Validate.int(1950, Year.now().getValue + 1)) and
+      (__ \ "year").readNullable(modelYear(() => Year.now())) and
       (__ \ "plate").read(Validate.text(3, 20)) and
       (__ \ "vin").readNullable(vin).map(_.flatten) and
       (__ \ "mileageKm").readNullable(Validate.int(0, 2_000_000))

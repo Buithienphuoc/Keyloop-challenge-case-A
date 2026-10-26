@@ -1,5 +1,5 @@
 // Data flow diagram, level 1. Render: dot -Tpng -Gdpi=150 dfd-level1.dot -o dfd-level1.png
-// Processes = numbered circles, data stores = open boxes (D1..D8), external entities = grey boxes.
+// Processes = numbered circles, data stores = open boxes (D1..D9), external entities = grey boxes.
 digraph level1 {
   graph [rankdir=LR, fontname="Helvetica", fontsize=20, labelloc=t, nodesep=0.35, ranksep=1.3, pad=0.4, newrank=true,
          label="Data flow diagram, level 1: inside the Unified Service Scheduler\n\n"];
@@ -12,7 +12,9 @@ digraph level1 {
   advisor    [label="Service advisor"];
   technician [label="Technician"];
   admin      [label="Dealership admin\n/ system manager"];
-  monitor    [label="Monitoring platform", style="filled,dashed"];
+  controller [label="Workshop controller"];
+  partsStaff [label="Parts staff"];
+  monitor    [label="Monitoring platform\n(Prometheus, Jaeger)"];
 
   // Processes
   node [shape=circle, style=filled, fillcolor="#1D4E89", fontcolor=white, width=1.55, fixedsize=true, fontsize=11];
@@ -23,6 +25,8 @@ digraph level1 {
   p5 [label="5\nHandle advice\nrequest"];
   p6 [label="6\nManage\nlifecycle"];
   p7 [label="7\nObserve", fillcolor="#56636B"];
+  p8 [label="8\nDispatch\njobs"];
+  p9 [label="9\nManage\nparts"];
 
   // Data stores (open-ended boxes)
   node [shape=record, style=filled, fillcolor="#FFF7D6", fontcolor="#1F2A30", fixedsize=false, width=2.2, height=0.45, fontsize=11];
@@ -33,9 +37,10 @@ digraph level1 {
   d5 [label="{D5 | consultation requests}"];
   d6 [label="{D6 | appointments\n(EXCLUDE: bay, technician, vehicle)}"];
   d7 [label="{D7 | appointment events (audit)}"];
-  d8 [label="{D8 | logs, metrics}"];
+  d8 [label="{D8 | logs, metrics, traces}"];
+  d9 [label="{D9 | parts, part orders\n(stock CHECK \>= 0)}"];
 
-  { rank=same; customer; advisor; technician; admin; }
+  { rank=same; customer; advisor; technician; admin; controller; partsStaff; }
   { rank=same; p1; p2; p5; }
   { rank=same; p3; p6; }
   { rank=same; d1; d2; d3; d4; }
@@ -47,7 +52,8 @@ digraph level1 {
   d1 -> p1 [label="user, role,\ndealership"];
 
   // 2 Resources
-  admin -> p2 [label="bays, technicians,\nstaff, dealership"];
+  admin -> p2 [label="bays, technicians, staff,\nopening hours, dealership,\npackage catalogue"];
+  p2 -> d3 [label="packages"];
   p2 -> d2 [label="resource rows"];
   p2 -> d1 [label="staff accounts"];
 
@@ -59,12 +65,12 @@ digraph level1 {
   p3 -> customer [label="slots with capacity"];
 
   // 4 Booking
-  customer -> p4 [label="start, Idempotency-Key"];
+  customer -> p4 [label="start, Idempotency-Key;\nconfirm the hold"];
   d4 -> p4 [label="owned vehicle"];
   p3 -> p4 [label="free (bay, technician)\npairs, best fit"];
-  p4 -> d6 [label="new appointment\n(row lock + EXCLUDE)"];
+  p4 -> d6 [label="HELD appointment, then CONFIRMED;\nexpired holds released\n(row lock + EXCLUDE)"];
   p4 -> d5 [label="mark BOOKED"];
-  p4 -> customer [label="confirmation or\n409 + alternatives"];
+  p4 -> customer [label="hold with countdown,\nconfirmation, or\n409 + alternatives"];
   customer -> p4 [label="new vehicle details"];
   p4 -> d4 [label="vehicle"];
 
@@ -87,8 +93,25 @@ digraph level1 {
   p6 -> advisor [label="day board"];
   p6 -> technician [label="my jobs"];
 
+  // 8 Dispatch (workshop controller)
+  d6 -> p8 [label="busy periods"];
+  d2 -> p8 [label="bays, shifts, skills"];
+  p8 -> controller [label="workload per bay\nand technician"];
+  controller -> p8 [label="move job: bay,\ntechnician, reason"];
+  p8 -> d6 [label="new bay / technician\n(EXCLUDE)"];
+  p8 -> d7 [label="who moved it, why"];
+
+  // 9 Parts
+  advisor -> p9 [label="order parts for a job"];
+  technician -> p9 [label="order parts for a job"];
+  partsStaff -> p9 [label="stock, order → receive → issue"];
+  p9 -> d9 [label="stock levels, orders,\norder events"];
+  d9 -> p9 [label="shelf, open orders"];
+  d6 -> p9 [label="job belongs\nto dealership"];
+  p9 -> partsStaff [label="orders to fulfil"];
+
   // 7 Observe (every process emits)
-  { p1 p3 p4 p5 p6 } -> p7 [style=dotted, arrowhead=none, color="#9AA5AB"];
-  p7 -> d8 [label="JSON logs, counters,\nlatency histograms"];
-  d8 -> monitor [label="/metrics, log shipping", style=dashed];
+  { p1 p3 p4 p5 p6 p8 p9 } -> p7 [style=dotted, arrowhead=none, color="#9AA5AB"];
+  p7 -> d8 [label="JSON logs, counters,\nlatency histograms, spans"];
+  d8 -> monitor [label="/metrics scrape,\nOTLP traces"];
 }

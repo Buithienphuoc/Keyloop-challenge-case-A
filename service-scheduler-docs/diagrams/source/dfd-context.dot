@@ -11,28 +11,36 @@ digraph context {
   technician [label="Technician"];
   admin      [label="Dealership admin"];
   sysmgr     [label="System manager"];
-  monitor    [label="Monitoring platform\n(Prometheus, log store)", style="filled,dashed"];
+  controller [label="Workshop controller"];
+  partsStaff [label="Parts staff"];
+  monitor    [label="Monitoring platform\n(Prometheus, Jaeger, log store)"];
 
   system [shape=circle, style=filled, fillcolor="#1D4E89", fontcolor=white, fontsize=15, width=2.6, fixedsize=true,
           label="0\nUnified Service\nScheduler"];
 
   { rank=same; customer; sysmgr; }
-  { rank=same; advisor; technician; admin; monitor; }
+  { rank=same; advisor; technician; admin; controller; partsStaff; monitor; }
 
-  customer -> system [label="credentials, vehicle details,\nbooking request (package, dealership, start,\nIdempotency-Key), advice request, cancellation"];
-  system -> customer [label="session token, packages and checklists,\nfree slots, confirmation or 3 alternatives,\nadvice decision, appointment status"];
+  customer -> system [label="credentials, vehicle details,\nhold request (package, dealership, start,\nIdempotency-Key), hold confirmation,\nadvice request, cancellation"];
+  system -> customer [label="session token, packages and checklists,\nfree slots, hold with expiry, confirmation\nor 3 alternatives,\nadvice decision, appointment status"];
 
-  sysmgr -> system [label="new dealership (hours, zone, grid),\nfirst admin account"];
-  system -> sysmgr [label="dealership list with capacity"];
+  sysmgr -> system [label="new dealership (hours, zone, grid),\nfirst admin account, service packages"];
+  system -> sysmgr [label="dealership list with capacity,\npackage catalogue"];
 
   system -> advisor [label="day board (bays x hours),\nadvice request queue"];
-  advisor -> system [label="advice decision (duration, skill,\nbay type, estimate), start / done /\nno-show / cancel"];
+  advisor -> system [label="advice decision (duration, skill,\nbay type, estimate), start / done /\nno-show / cancel, parts order"];
 
   system -> technician [label="today's assigned jobs"];
-  technician -> system [label="job started, job finished"];
+  technician -> system [label="job started, job finished,\nparts order"];
 
-  admin -> system [label="service bays, technicians\n(skills, shifts, days), staff accounts"];
+  system -> controller [label="workload per bay and technician"];
+  controller -> system [label="job moves (bay, technician, reason)"];
+
+  system -> partsStaff [label="stock levels, parts orders"];
+  partsStaff -> system [label="stock changes, order → receive → issue"];
+
+  admin -> system [label="service bays, technicians\n(skills, shifts, days), staff accounts,\nopening hours and booking rules"];
   system -> admin [label="resource lists"];
 
-  system -> monitor [label="JSON log lines (requestId),\n/metrics, /health", style=dashed];
+  system -> monitor [label="JSON log lines (requestId, traceId),\n/metrics, /health, OTLP traces"];
 }

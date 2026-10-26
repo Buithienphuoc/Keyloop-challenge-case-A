@@ -3,18 +3,27 @@
 title Appointment lifecycle (enforced in domain/Lifecycle.scala)
 hide empty description
 
-[*] --> CONFIRMED : customer books
+[*] --> HELD : customer picks a time\n(POST /api/appointments/holds)
+[*] --> CONFIRMED : customer books directly\n(POST /api/appointments)
+HELD --> CONFIRMED : customer confirms before\nhold_expires_at (POST …/confirm)
+HELD --> CANCELLED : customer releases the hold
+HELD --> EXPIRED : hold ran out (system: booking flow,\njob move, confirm, or HoldSweeper)
 CONFIRMED --> IN_PROGRESS : advisor, admin or the\nassigned technician starts
 IN_PROGRESS --> COMPLETED : advisor, admin or the\nassigned technician finishes
 CONFIRMED --> CANCELLED : customer before the start time;\nadvisor / admin before work starts
 CONFIRMED --> NO_SHOW : advisor / admin,\nafter the start time
+CONFIRMED --> CONFIRMED : workshop controller / admin\nmoves the job (bay, technician)
 COMPLETED --> [*]
 CANCELLED --> [*]
 NO_SHOW --> [*]
+EXPIRED --> [*]
 
-note right of CONFIRMED
-  CONFIRMED and IN_PROGRESS hold the bay,
+note right of HELD
+  A hold lasts 10 minutes (HOLD_MINUTES).
+  HELD, CONFIRMED and IN_PROGRESS take the bay,
   the technician and the vehicle: the database's
-  EXCLUDE constraints apply only to these two.
+  EXCLUDE constraints apply to these three (V2).
+  Cancelling or expiring a consulted appointment
+  reopens its consultation request (BOOKED → APPROVED).
 end note
 @enduml

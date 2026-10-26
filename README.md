@@ -9,6 +9,8 @@ Both layers are implemented. The backend (**Scala 3 + Play 3**, PostgreSQL) is t
 implemented" layer the brief asks for: REST API, tests, logging and metrics. The frontend is a
 working React app rather than a stub, so the whole journey can be demonstrated.
 
+What changed in each pull request: [PATCH_NOTES.md](PATCH_NOTES.md).
+
 ## Quick start
 
 Requirements: **JDK 21+**, **sbt 1.10+** and **Node.js 22+** (for the web app). No Docker needed:
@@ -64,7 +66,7 @@ Using your own PostgreSQL instead: `docker compose up -d`, then
 ## Tests
 
 ```bash
-npm test          # = cd backend && sbt test: 95 tests (unit, property-based, architecture, API, concurrency)
+npm test          # = cd backend && sbt test: 274 tests (unit, property-based, architecture, API, concurrency)
 npm run test:load # = sbt loadTest: three bursts of 1000 simultaneous HTTP requests
 ```
 
@@ -74,6 +76,15 @@ npm run test:load # = sbt loadTest: three bursts of 1000 simultaneous HTTP reque
 | `unit/AvailabilityPropertySpec` | ScalaCheck, for thousands of random workshops and booking streams: no bay or technician is ever double-booked; every assignment has the right skill, bay type and shift; the advertised capacity is exactly what fits; no slot shown as free is refused at booking |
 | `unit/LifecycleSpec` | Appointment state machine and who may do what, when |
 | `unit/BookingServiceFakesSpec` | Booking retry and error mapping on in-memory fakes of every port (no database): lost race → next free pair, deadlock → retry, give up after 5, vehicle double-booking, job not offered |
+| `unit/AppointmentServiceSpec` | Who may see and move which appointment (customer, staff, technician, system manager), every lifecycle error mapped to its API code, hold confirm / expiry / double confirm |
+| `unit/DispatchServiceSpec` | Moving a job: bay type, technician skill and shift, nothing-to-change, overlap → `RESOURCE_BUSY`, expired holds released first; the day's workload |
+| `unit/SchedulingSupportSpec` | What a package or approved consultation requires (ownership, dealership, vehicle), nearest free slots, a day's availability, the hold sweeper |
+| `unit/PartsServiceSpec` | Parts shelf and orders on a stock-keeping fake: lines merged, stock never below zero, receive → issue, invalid transitions |
+| `unit/ConsultationServiceSpec` | Submit, approve / reject once, unknown skill, bay that cannot take the vehicle, visibility and cancel rules |
+| `unit/IdentitySpec` | Password hashing and verify (incl. corrupted hashes), session tokens, register / login / logout, one 401 for every login failure |
+| `unit/AdminServicesSpec` | Technicians with a login in one transaction, shifts and opening hours, dealership onboarding, package bay/vehicle fit, vehicles |
+| `unit/ValidateSpec`, `unit/RequestReadsSpec` | Every validation building block and the request shapes of each module (one-of rules, VIN, passwords, 15-minute grid, allowed roles) |
+| `unit/DomainRulesSpec` | Bay compatibility, both lifecycles checked exhaustively, workload figures, references |
 | `unit/ArchitectureSpec` | The dependency rule: no domain, application or port file imports an adapter, the HTTP layer, `play.api.mvc`, Anorm, JDBC, the driver or SQL helpers |
 | `integration/BookingConcurrencySpec` | 50 simultaneous requests for one slot: exactly as many succeed as there are free bay/technician pairs; 50 retries with one `Idempotency-Key` create one booking (ten rounds, never a 500); each database constraint rejects overlaps on its own |
 | `integration/ApiSpec` | Auth and logout revocation, role and dealership isolation, the booking and consultation journeys, alternatives on conflict, technician workflow, admin onboarding, request-ID propagation, metrics, and that every route is in the OpenAPI contract |
