@@ -13,6 +13,12 @@ Entry format:
 
 ## Unreleased
 
+### #13 Azure setup re-creates apps that still have a managed identity (`fix/azure-express-identity`)
+- **Fixed:** re-running `deploy/azure/setup.sh` no longer stops at "Allow the web app's origin on
+  the API" with "ExpressEnvironmentFeatureNotSupported": an app the first version of the script
+  gave a system-assigned identity (still on the placeholder image) is deleted and made again.
+- **Upgrade notes:** run the script again.
+
 ### #12 Azure setup works on express Container Apps environments (`fix/azure-express-env`)
 - **Fixed:** `deploy/azure/setup.sh` no longer stops at the web app with
   "ExpressEnvironmentFeatureNotSupported": both apps now pull images with the registry's admin

@@ -95,6 +95,15 @@ step "Container Apps environment $CAE"
 exists az containerapp env show -g "$RG" -n "$CAE" || az containerapp env create -g "$RG" -n "$CAE" -l "$LOCATION" -o none
 
 step "API app scheduler-api (internal, 1-5 replicas)"
+# Express environments refuse any change to an app that has a managed identity, and the first
+# version of this script gave each app one. Such an app still runs the placeholder image, so it
+# is simply made again below.
+for app in scheduler-api scheduler-web; do
+  if [ "$(az containerapp show -g "$RG" -n "$app" --query "identity.type" -o tsv 2>/dev/null || true)" = SystemAssigned ]; then
+    echo "    ($app has a managed identity, which express environments reject: making it again)"
+    az containerapp delete -g "$RG" -n "$app" --yes -o none
+  fi
+done
 if ! exists az containerapp show -g "$RG" -n scheduler-api; then
   # B1ms allows ~50 connections: 5 replicas x 8 stays under it.
   az containerapp create -g "$RG" -n scheduler-api --environment "$CAE" --image "$PLACEHOLDER" \
