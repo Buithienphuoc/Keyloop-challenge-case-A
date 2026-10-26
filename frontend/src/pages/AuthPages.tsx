@@ -3,6 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ErrorNote, Plate } from '../components/ui';
 
+// Dev profile only: the one-tap demo accounts exist in the `vite` dev server on localhost. A
+// production build (`vite build`, every Docker image) leaves them out of the bundle entirely, so
+// the deployed site never ships a password.
+const SHOW_DEMO_ACCOUNTS =
+  import.meta.env.DEV && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 const DEMO_PASSWORD = 'Demo@2026';
 const DEMO_ACCOUNTS = [
   { email: 'customer@demo.vn', role: 'Customer' },
@@ -81,24 +86,26 @@ export function LoginPage() {
           New here? <Link to="/register">Create an account</Link>
         </p>
 
-        <div className="demo">
-          <p className="small muted">Demo accounts (password {DEMO_PASSWORD}). Tap one to fill the form.</p>
-          <div className="demo-list">
-            {DEMO_ACCOUNTS.map((a) => (
-              <button
-                type="button"
-                key={a.email}
-                onClick={() => {
-                  setEmail(a.email);
-                  setPassword(DEMO_PASSWORD);
-                }}
-              >
-                <span>{a.email}</span>
-                <span>{a.role}</span>
-              </button>
-            ))}
+        {SHOW_DEMO_ACCOUNTS && (
+          <div className="demo">
+            <p className="small muted">Demo accounts (password {DEMO_PASSWORD}). Tap one to fill the form.</p>
+            <div className="demo-list">
+              {DEMO_ACCOUNTS.map((a) => (
+                <button
+                  type="button"
+                  key={a.email}
+                  onClick={() => {
+                    setEmail(a.email);
+                    setPassword(DEMO_PASSWORD);
+                  }}
+                >
+                  <span>{a.email}</span>
+                  <span>{a.role}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </form>
     </AuthShell>
   );

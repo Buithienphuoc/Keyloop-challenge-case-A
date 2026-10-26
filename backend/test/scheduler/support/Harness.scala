@@ -31,7 +31,7 @@ final case class Response(status: Int, headers: Map[String, String], body: Strin
  * in-process (filters, routing, body parsing; no network socket), and everything else
  * (validation, auth, SQL, constraints) is real.
  */
-final class Harness(now: String, seed: Boolean = true):
+final class Harness(now: String, seed: Boolean = true, settings: Map[String, String] = Map.empty):
   val clock = TestClock(OffsetDateTime.parse(now).toInstant)
 
   val components: AppComponents =
@@ -41,7 +41,7 @@ final class Harness(now: String, seed: Boolean = true):
         "scheduler.database-url" -> TestDatabase.fresh(),
         "scheduler.seed-demo-data" -> seed.toString,
         "scheduler.slow-query-ms" -> "10000"
-      )
+      ) ++ settings
     )
     AppComponents(context, () => clock.current)
 

@@ -14,9 +14,14 @@ class AuthSpec extends E2ESuite:
       ui.path shouldBe "/login"
     }
 
-    it("fills the form from a demo account button and opens the customer's home") {
+    it("shows no demo account on a production build and signs in with typed credentials") {
       ui.open("/login")
-      ui.click(ui.containing("button", "customer@demo.vn"))
+      ui.fill("Email", "customer@demo.vn")
+      // The one-tap demo accounts are for the dev server (npm run dev) on localhost only.
+      if !Settings.baseUrl.endsWith(":5173") then
+        ui.notSee(Settings.DemoPassword) shouldBe true
+        ui.notSee("Demo accounts") shouldBe true
+      ui.fill("Password", Settings.DemoPassword)
       ui.clickButton("Sign in")
       ui.visible(ui.exact("a", "Book a service"))
       ui.see("Lê Minh Tuấn")

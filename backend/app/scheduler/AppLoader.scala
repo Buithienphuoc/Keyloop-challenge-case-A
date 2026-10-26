@@ -51,6 +51,8 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
 
   val log: Log = Log()
   val config: Config = Config.from(configuration, environment.rootPath)
+  Config.checkProfile(config, configuration.get[String]("play.http.secret.key"), sys.env)
+  log.info("server.profile", "profile" -> config.profile.toString.toLowerCase)
 
   // ---- infrastructure ------------------------------------------------------------------------
   private val embedded: Option[EmbeddedDatabase] =
@@ -61,7 +63,7 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
 
   val db: PgDb = PgDb(config.databaseUrl.orElse(embedded.map(_.jdbcUrl)).get, log, config.slowQueryMs, config.dbPoolSize)
   Migrations.run(db.dataSource, log)
-  if config.seedDemoData then Seed.demoData(db, log, clock())
+  if config.seedDemoData then Seed.demoData(db, log, Seed.passwordsFor(config), clock())
   Metrics.registerJvmMetrics()
 
   // Every instance runs the sweeper; instances never wait on each other (see HoldSweeper).

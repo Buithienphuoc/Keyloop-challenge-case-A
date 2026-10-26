@@ -6,7 +6,7 @@
 #
 # It creates, in one resource group:
 #   - Azure Container Registry (Basic)              images pushed by GitHub Actions
-#   - PostgreSQL Flexible Server (Burstable B1ms)   the one shared database
+#   - PostgreSQL Flexible Server (Burstable B1ms)   the one shared database (scheduler_prod)
 #   - Container Apps environment + two apps:
 #       scheduler-api  internal only, 1-5 replicas, scales on concurrent HTTP requests
 #       scheduler-web  public HTTPS, nginx serving the web app and forwarding /api to scheduler-api
@@ -84,12 +84,12 @@ elif [ "$NEW_PASSWORD" = true ]; then
   az postgres flexible-server update -g "$RG" -n "$PG" --admin-password "$DB_PASSWORD" -o none
 fi
 # Newer Azure CLI versions only accept --database-name for elastic clusters, so the database is
-# created on its own.
-exists az postgres flexible-server db show -g "$RG" -s "$PG" -n scheduler ||
-  az postgres flexible-server db create -g "$RG" -s "$PG" -n scheduler -o none
+# created on its own. The site runs the API's prod profile, on a database of its own.
+exists az postgres flexible-server db show -g "$RG" -s "$PG" -n scheduler_prod ||
+  az postgres flexible-server db create -g "$RG" -s "$PG" -n scheduler_prod -o none
 # The schema uses btree_gist for its no-double-booking constraints; Azure needs it allow-listed.
 az postgres flexible-server parameter set -g "$RG" -s "$PG" --name azure.extensions --value BTREE_GIST,PGCRYPTO -o none
-DATABASE_URL="jdbc:postgresql://${PG}.postgres.database.azure.com:5432/scheduler?user=scheduler&password=${DB_PASSWORD}&sslmode=require"
+DATABASE_URL="jdbc:postgresql://${PG}.postgres.database.azure.com:5432/scheduler_prod?user=scheduler&password=${DB_PASSWORD}&sslmode=require"
 
 step "Container Apps environment $CAE"
 # The environment must be a standard (Consumption) one. Azure can hand out an "express"
@@ -126,7 +126,7 @@ if ! exists az containerapp show -g "$RG" -n scheduler-api; then
     --scale-rule-name http-load --scale-rule-type http --scale-rule-http-concurrency 30 \
     "${REGISTRY[@]}" \
     --secrets "database-url=$DATABASE_URL" "app-secret=$APP_SECRET" \
-    --env-vars DATABASE_URL=secretref:database-url APPLICATION_SECRET=secretref:app-secret DB_POOL_SIZE=8 LOG_FORMAT=json \
+    --env-vars APP_PROFILE=prod DATABASE_URL=secretref:database-url APPLICATION_SECRET=secretref:app-secret DB_POOL_SIZE=8 LOG_FORMAT=json \
     -o none
 elif [ "$NEW_PASSWORD" = true ]; then
   # The database password was just reset: give the API the new connection string and restart it.
@@ -197,6 +197,11 @@ Add these as GitHub repository VARIABLES (not secrets): https://github.com/${GIT
   AZURE_SUBSCRIPTION_ID  $(az account show --query id -o tsv)
   AZURE_RESOURCE_GROUP   ${RG}
   AZURE_ACR              ${ACR}
+
+and the production account passwords as the repository SECRET PROD_SEED_ACCOUNTS
+(https://github.com/${GITHUB_REPO}/settings/secrets/actions): run
+  python3 deploy/azure/prod-accounts.py ~/prod-accounts
+on your own computer, keep prod-accounts.txt private and paste PROD_SEED_ACCOUNTS.secret.txt.
 
 Then push to master (or re-run the CI/CD workflow on master). The site will be at:
   ${WEB_URL}
