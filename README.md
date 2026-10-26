@@ -9,6 +9,8 @@ Both layers are implemented. The backend (**Scala 3 + Play 3**, PostgreSQL) is t
 implemented" layer the brief asks for: REST API, tests, logging and metrics. The frontend is a
 working React app rather than a stub, so the whole journey can be demonstrated.
 
+What changed in each pull request: [PATCH_NOTES.md](PATCH_NOTES.md).
+
 ## Quick start
 
 Requirements: **JDK 21+**, **sbt 1.10+** and **Node.js 22+** (for the web app). No Docker needed:
