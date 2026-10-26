@@ -13,6 +13,10 @@ Entry format:
 
 ## Unreleased
 
+### #10 E2E traceability after the diagram redraw (`docs/e2e-gaps-after-3`)
+- **Docs:** `docs/e2e-traceability.md` marks the diagram gaps fixed in #3; starting a job
+  before its day stays open as question Q1.
+
 ### #8 End-to-end tests for every use case and activity branch (`e2e/use-case-coverage`)
 - **Tests:** 31 new Selenium tests (57 in total): `ConsultFirstSpec`, `WorkshopDaySpec`,
   `BookingRulesSpec` and `AdminSpec` walk every drawn use case and every branch of the three
