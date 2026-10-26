@@ -144,7 +144,12 @@ exists az identity show -g "$RG" -n "$IDENTITY" || az identity create -g "$RG" -
 CLIENT_ID=$(az identity show -g "$RG" -n "$IDENTITY" --query clientId -o tsv)
 PRINCIPAL_ID=$(az identity show -g "$RG" -n "$IDENTITY" --query principalId -o tsv)
 # One credential per kind of job: building on master, and the "production" deployment job.
-for pair in "github-master:repo:${GITHUB_REPO}:ref:refs/heads/master" "github-production:repo:${GITHUB_REPO}:environment:production"; do
+# GitHub may name the repository in its token as "owner/repo" or, for newer repositories, with
+# their numeric ids ("owner@123/repo@456"), so both forms are registered.
+GITHUB_REPO_IDS=$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}" |
+  jq -r '"\(.owner.login)@\(.owner.id)/\(.name)@\(.id)"')
+for pair in "github-master:repo:${GITHUB_REPO}:ref:refs/heads/master" "github-production:repo:${GITHUB_REPO}:environment:production" \
+  "github-master-ids:repo:${GITHUB_REPO_IDS}:ref:refs/heads/master" "github-production-ids:repo:${GITHUB_REPO_IDS}:environment:production"; do
   name="${pair%%:*}"
   exists az identity federated-credential show -g "$RG" --identity-name "$IDENTITY" -n "$name" ||
     az identity federated-credential create -g "$RG" --identity-name "$IDENTITY" -n "$name" \
