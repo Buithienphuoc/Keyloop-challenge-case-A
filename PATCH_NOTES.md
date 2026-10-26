@@ -13,6 +13,13 @@ Entry format:
 
 ## Unreleased
 
+### #15 Deploy sets the app ports before the new images (`fix/deploy-ingress-order`)
+- **Fixed:** the first deploy to Azure failed at "Roll out the new images": the new API revision
+  started while ingress still pointed at the placeholder's port 80, so it never became ready.
+  Ingress now moves to 8081/8080 first, then the images are updated.
+- **Changed:** when a deploy fails, the job adds the Azure error, each app's revisions and its
+  latest system and console logs to the run summary as annotations.
+
 ### #14 GitHub Actions can sign in to Azure (`fix/azure-oidc-subject`)
 - **Fixed:** the CI/CD "Sign in to Azure" step failed with AADSTS700213 because GitHub names this
   repository in its OpenID Connect token by numeric ids (`Buithienphuoc@37607399/Keyloop-challenge-case-A@1432964156`).

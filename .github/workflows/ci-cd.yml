@@ -165,17 +165,21 @@ jobs:
       - name: Roll out the new images
         id: rollout
         run: |
+          exec 2> >(tee "$RUNNER_TEMP/rollout.err" >&2) # kept for the failure report below
           az config set extension.use_dynamic_install=yes_without_prompt --only-show-errors
+          # The apps are created with a placeholder image on port 80. Point ingress at our ports
+          # before the new image goes in: ingress is app-wide (no new revision), and a revision
+          # whose port does not answer never becomes ready, which fails the update.
+          for pair in scheduler-api:8081 scheduler-web:8080; do
+            app="${pair%%:*}"; port="${pair#*:}"
+            [ "$(az containerapp show -g "$RESOURCE_GROUP" -n "$app" --query properties.configuration.ingress.targetPort -o tsv)" = "$port" ] ||
+              az containerapp ingress update -g "$RESOURCE_GROUP" -n "$app" --target-port "$port" -o none
+          done
           # API first: the database migrates on its start-up, before the new web app needs it.
           az containerapp update -g "$RESOURCE_GROUP" -n scheduler-api \
             --image "$REGISTRY/service-scheduler-api:${{ github.sha }}" --only-show-errors -o none
-          # The apps are created with a placeholder image on port 80; point ingress at our ports.
-          [ "$(az containerapp show -g "$RESOURCE_GROUP" -n scheduler-api --query properties.configuration.ingress.targetPort -o tsv)" = 8081 ] ||
-            az containerapp ingress update -g "$RESOURCE_GROUP" -n scheduler-api --target-port 8081 -o none
           az containerapp update -g "$RESOURCE_GROUP" -n scheduler-web \
             --image "$REGISTRY/service-scheduler-web:${{ github.sha }}" --only-show-errors -o none
-          [ "$(az containerapp show -g "$RESOURCE_GROUP" -n scheduler-web --query properties.configuration.ingress.targetPort -o tsv)" = 8080 ] ||
-            az containerapp ingress update -g "$RESOURCE_GROUP" -n scheduler-web --target-port 8080 -o none
           fqdn=$(az containerapp show -g "$RESOURCE_GROUP" -n scheduler-web --query properties.configuration.ingress.fqdn -o tsv)
           echo "url=https://$fqdn" >> "$GITHUB_OUTPUT"
       - name: Smoke test
@@ -188,3 +192,18 @@ jobs:
             sleep 10
           done
           echo "The site did not become healthy in time" >&2; exit 1
+      - name: Show why a rollout failed
+        if: failure()
+        run: |
+          # Printed as annotations, so the cause shows on the run's summary page.
+          annotate() { local t="${2//'%'/'%25'}"; t="${t//$'\r'/}"; echo "::error title=$1::${t//$'\n'/'%0A'}"; }
+          [ -s "$RUNNER_TEMP/rollout.err" ] && annotate "rollout" "$(tail -c 8000 "$RUNNER_TEMP/rollout.err")"
+          for app in scheduler-api scheduler-web; do
+            report=$( {
+              az containerapp revision list -g "$RESOURCE_GROUP" -n "$app" \
+                --query "[].{revision:name, active:properties.active, health:properties.healthState, state:properties.runningState, image:properties.template.containers[0].image}" -o table
+              az containerapp logs show -g "$RESOURCE_GROUP" -n "$app" --type system --tail 20 --format text
+              az containerapp logs show -g "$RESOURCE_GROUP" -n "$app" --type console --tail 40 --format text
+            } 2>&1 | tail -c 20000 || true)
+            annotate "$app" "$report"
+          done
