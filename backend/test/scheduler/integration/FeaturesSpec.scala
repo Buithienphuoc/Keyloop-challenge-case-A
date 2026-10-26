@@ -168,6 +168,25 @@ class FeaturesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
         .as(SqlParser.scalar[String].single)) should include("reason: Sick leave")
     }
 
+    it("moves only the bay of a job whose technician has since been deactivated") {
+      val (job, bayId, techId) = h.sql(SQL"""SELECT id::text, bay_id::text, technician_id::text FROM appointments
+          WHERE dealership_id = $d1::uuid AND status = 'CONFIRMED' AND lower(period) = '2026-11-03T14:00:00+07:00'::timestamptz LIMIT 1"""
+        .as((SqlParser.str("id") ~ SqlParser.str("bay_id") ~ SqlParser.str("technician_id")).map { case a ~ b ~ c => (a, b, c) }.single))
+      val otherStand = Seq("Stand A", "Stand B", "Stand C").map(bay).find(_ != bayId).get
+      def setActive(active: Boolean) =
+        h.api("PATCH", s"/api/admin/technicians/$techId", adminD1, Json.obj("isActive" -> active)).status shouldBe 200
+
+      setActive(false)
+      try
+        val moved = post(s"/api/appointments/$job/reassign", controller, Json.obj("bayId" -> otherStand, "reason" -> "Lift repair"))
+        moved.status shouldBe 200
+        moved.str("bay.id") shouldBe otherStand
+        moved.str("technician.id") shouldBe techId
+        // Naming the unchanged technician explicitly is fine too: only what changes is checked.
+        post(s"/api/appointments/$job/reassign", controller, Json.obj("technicianId" -> techId, "bayId" -> bayId)).status shouldBe 200
+      finally setActive(true)
+    }
+
     it("never double-books: moving onto a technician who is busy then is refused") {
       val tenOClock = h.sql(SQL"""SELECT id::text, technician_id::text FROM appointments WHERE dealership_id = $d1::uuid
           AND status = 'CONFIRMED' AND lower(period) = '2026-11-03T10:00:00+07:00'::timestamptz ORDER BY id"""

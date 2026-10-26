@@ -2,7 +2,7 @@ package scheduler.modules.scheduling.application
 
 import scheduler.modules.catalog.{CatalogReader, Dealership}
 import scheduler.modules.consultation.ConsultationStatus
-import scheduler.modules.identity.{AuthContext, Role, assertSameDealership}
+import scheduler.modules.identity.{AuthContext, assertCanSee}
 import scheduler.modules.scheduling.domain.{Bay, Requirement, Technician, WorkshopRules}
 import scheduler.modules.vehicles.Vehicle
 import scheduler.shared.{AppError, DbSession}
@@ -49,8 +49,7 @@ final class WorkshopContext(catalog: CatalogReader, consultations: ConsultationB
 
       case (None, Some(requestId)) =>
         val c = consultations.forBooking(s, requestId).getOrElse(throw AppError.notFound("Consultation request"))
-        if auth.role == Role.CUSTOMER && c.customerId != auth.userId then throw AppError.notFound("Consultation request")
-        if auth.role != Role.CUSTOMER then assertSameDealership(auth, c.dealershipId)
+        assertCanSee(auth, c.customerId, c.dealershipId, "Consultation request")
         if c.dealershipId != dealershipId then
           throw AppError.unprocessable("WRONG_DEALERSHIP", "This request was reviewed by another dealership")
         vehicle.foreach { v =>

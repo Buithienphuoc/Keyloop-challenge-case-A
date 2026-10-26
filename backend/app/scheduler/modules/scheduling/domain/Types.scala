@@ -1,6 +1,6 @@
 package scheduler.modules.scheduling.domain
 
-import java.time.{LocalTime, ZoneId, ZonedDateTime}
+import java.time.{Instant, LocalDate, LocalTime, ZoneId, ZonedDateTime}
 
 enum VehicleType:
   case MOTORBIKE, CAR
@@ -23,6 +23,11 @@ final case class WorkshopRules(
     minLeadMinutes: Int, // earliest start = now + lead
     maxDaysAhead: Int // latest bookable day
 )
+
+object LocalDay:
+  /** A local day in a time zone as a half-open range of instants [start of day, start of next day). */
+  def bounds(date: LocalDate, zone: ZoneId): (Instant, Instant) =
+    (date.atStartOfDay(zone).toInstant, date.plusDays(1).atStartOfDay(zone).toInstant)
 
 /** What a job needs from the workshop. Comes from a service package or an approved consultation. */
 final case class Requirement(durationMinutes: Int, requiredSkill: String, bayType: String)

@@ -141,7 +141,9 @@ class IdentitySpec extends AnyFunSpec with Matchers:
         "EMAIL_TAKEN"
     }
 
-    it("answers USER_NOT_FOUND for a user that no longer exists") {
-      (the[AppError] thrownBy Fixture().service.getUser("ghost")).code shouldBe "USER_NOT_FOUND"
+    it("answers 404 NOT_FOUND for a user that no longer exists") {
+      val e = the[AppError] thrownBy Fixture().service.getUser("ghost")
+      e.status shouldBe 404
+      e.code shouldBe "NOT_FOUND"
     }
   }

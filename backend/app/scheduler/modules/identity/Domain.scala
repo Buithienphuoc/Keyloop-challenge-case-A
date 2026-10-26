@@ -26,3 +26,17 @@ final case class PublicUser(
 def assertSameDealership(auth: AuthContext, dealershipId: String): Unit =
   if auth.role != Role.SYSTEM_MANAGER && !auth.dealershipId.contains(dealershipId) then
     throw AppError.forbidden("This belongs to another dealership")
+
+/**
+ * Who may see a record owned by a customer at a dealership: the customer themselves, or staff
+ * of that dealership. A customer asking for someone else's record gets 404, so ids do not leak.
+ */
+def assertCanSee(auth: AuthContext, ownerId: String, dealershipId: String, what: String): Unit =
+  if auth.role == Role.CUSTOMER then
+    if ownerId != auth.userId then throw AppError.notFound(what)
+  else assertSameDealership(auth, dealershipId)
+
+extension (auth: AuthContext)
+  /** The caller's dealership; 403 for an account that is not attached to one. */
+  def requireDealership: String =
+    auth.dealershipId.getOrElse(throw AppError.forbidden("Your account is not attached to a dealership"))

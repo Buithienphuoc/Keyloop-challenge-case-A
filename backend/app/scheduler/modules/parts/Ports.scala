@@ -23,6 +23,9 @@ final class OutOfStockError(val parts: Seq[String]) extends RuntimeException(s"N
 trait PartsRepository:
   def listParts(dealershipId: String): Seq[Part]
 
+  /** One part of the dealership. Adapters may override this with a single-row query. */
+  def getPart(dealershipId: String, partId: String): Option[Part] = listParts(dealershipId).find(_.id == partId)
+
   /** 409 SKU_TAKEN. */
   def addPart(dealershipId: String, part: NewPart): String
 
