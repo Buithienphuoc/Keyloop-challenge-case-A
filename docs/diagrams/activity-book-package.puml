@@ -1,6 +1,6 @@
 @startuml activity-book-package
 !include _style.iuml
-title Activity — customer books a maintenance package (UC04, with UC20, UC21, UC22)
+title Activity — customer books a maintenance package (UC04, with UC12, UC20, UC21, UC22)
 
 |Customer|
 |Web app|
@@ -29,11 +29,11 @@ whole job, inside opening hours, after lead time;
 refresh availability every 30 s;
 repeat
   |Customer|
-  :Pick a start time;
-  :Review, add a note, press **Confirm booking**;
+  :Pick a start time, add a note,
+  press **Hold this time and review**;
   |Web app|
-  :Send with an Idempotency-Key
-  (new key per distinct attempt);
+  :POST /api/appointments/holds with an
+  Idempotency-Key (new key per distinct attempt);
   |API|
   if (Same key already booked?) then (yes)
     :Return the original appointment
@@ -45,12 +45,14 @@ inside hours, ≥ lead time, ≤ max days ahead) then (no)
     else (yes)
       repeat
         :Transaction: read free bays and technicians,
+        release expired holds in the way,
         allocate best fit (fewest skills, least loaded);
         if (A free pair?) then (no)
           break
         endif
         |PostgreSQL|
-        :INSERT appointment;
+        :INSERT appointment as HELD
+        (hold_expires_at = now + 10 min);
         :EXCLUDE constraints reject any overlap
         of bay, technician or vehicle;
         note right
@@ -62,8 +64,8 @@ inside hours, ≥ lead time, ≤ max days ahead) then (no)
 and fewer than 5 attempts?) is (yes: retry with fresh data)
       -> no;
       if (Inserted?) then (yes)
-        :Commit, record CONFIRMED in the audit trail,
-        log booking.created, count the metric;
+        :Commit, record HELD in the audit trail,
+        log booking.held, count holds{created};
       else (no)
         :409 SLOT_UNAVAILABLE with the 3 nearest
         free times, log booking.slot_unavailable;
@@ -74,8 +76,28 @@ and fewer than 5 attempts?) is (yes: retry with fresh data)
     endif
   endif
   |Customer|
-repeat while (Booked?) is (no: pick another time\nor one of the alternatives)
+repeat while (Held?) is (no: pick another time\nor one of the alternatives)
 -> yes;
+|Web app|
+:Show the review screen with a countdown
+until hold_expires_at;
+|Customer|
+:Press **Confirm booking**;
+|API|
+:POST /api/appointments/:id/confirm
+(row lock on the appointment);
+if (Still HELD and before hold_expires_at?) then (yes)
+  :HELD → CONFIRMED, audit event,
+  log booking.hold_confirmed;
+else (no: ran out)
+  :HELD → EXPIRED, slot freed,
+  409 HOLD_EXPIRED;
+  |Web app|
+  :"Your hold ran out", offer
+  **Try to hold it again**;
+  |Customer|
+  stop
+endif
 |Web app|
 :Show the reference, technician and ticket;
 |Customer|

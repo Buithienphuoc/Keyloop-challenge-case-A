@@ -56,8 +56,19 @@ else (pick a time)
     Already booked by another tab or device
     → 409 CONSULTATION_NOT_BOOKABLE
   end note
-  :In one transaction: appointment **CONFIRMED**,
+  :In one transaction: appointment **HELD** for 10 minutes,
   request **BOOKED**;
+  |Customer|
+  :Review and press **Confirm booking**;
+  |System|
+  if (Confirmed before the hold ran out?) then (yes)
+    :HELD → **CONFIRMED**;
+  else (no)
+    :HELD → **EXPIRED**,
+    request back to **APPROVED**
+    so another time can be picked;
+    stop
+  endif
 endif
 |Customer|
 if (Cancels before the start?) then (yes)

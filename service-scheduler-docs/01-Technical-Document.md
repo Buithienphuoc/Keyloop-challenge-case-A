@@ -4,10 +4,10 @@
 
 | | |
 | --- | --- |
-| Version | 2.1 (English edition) |
+| Version | 2.2 (English edition) |
 | Date | 25 October 2026 |
 | Based on | The shared Vietnamese working document "Khảo sát hệ thống đặt lịch bảo dưỡng – Keyloop & đại lý" (revision 14) |
-| Changes from the Vietnamese edition | Translated into English, and updated to the delivered build: the backend now runs on Scala 3 + Play 3, so the sections on the first code version, concurrency and the SOLID review describe the Scala code. 2.1 adds the features built afterwards (holds, workshop controller, parts, opening hours, package catalogue, tracing), scaling out (5.4) and delivery (4.5) |
+| Changes from the Vietnamese edition | Translated into English, and updated to the delivered build: the backend now runs on Scala 3 + Play 3, so the sections on the first code version, concurrency and the SOLID review describe the Scala code. 2.1 adds the features built afterwards (holds, workshop controller, parts, opening hours, package catalogue, tracing), scaling out (5.4) and delivery (4.5). 2.2 adds the second readability and SOLID review (6.4) and brings the diagrams up to date with those features |
 
 ## 1. Summary
 
@@ -21,8 +21,9 @@ check that a **service bay** and a **technician with the right skill** are both 
 this solution goes further than the existing product.
 
 The delivered solution is a working system: a Scala 3 / Play 3 REST API on PostgreSQL, where three
-database constraints make double booking impossible, and a React web app for five roles. It is
-covered by 95 automated tests and a 1000-request load test.
+database constraints make double booking impossible, and a React web app for seven roles. It is
+covered by backend unit, property and integration tests, Selenium end-to-end tests in Chrome and a
+1000-request load test.
 
 ## 2. Agreed decisions
 
@@ -125,8 +126,9 @@ expected values. The TypeScript backend was then removed.
 | Embedded database | Zonky embedded-postgres (PostgreSQL 17.6 binaries) for `sbt run` and tests |
 | JSON | play-json, Jackson pinned to 2.19.1 |
 | Logging and metrics | Logback with logstash-logback-encoder, Prometheus Java client 1.10 |
+| Tracing | OpenTelemetry SDK with the OTLP exporter (Jaeger in docker-compose) |
 | API documentation | OpenAPI 3.1, Swagger UI 5.17 |
-| Tests | ScalaTest, ScalaCheck |
+| Tests | ScalaTest, ScalaCheck; Selenium WebDriver for end-to-end tests (`e2e/`) |
 | Frontend | React 19, React Router 7, TanStack Query 5, Vite 8, TypeScript 6, Luxon |
 
 ### 4.4 How a booking stays correct
@@ -135,7 +137,10 @@ expected values. The TypeScript backend was then removed.
    (bay, technician) pairs are free for the whole job: a bay of the required type, and a
    technician with the required skill who is on shift. This is pure code in
    `domain/Availability.scala`.
-2. `POST /api/appointments` checks again inside a transaction, picks a pair and inserts. **Best
+2. `POST /api/appointments/holds` (the web app) or `POST /api/appointments` checks again inside a
+   transaction, releases holds that ran out in its way, picks a pair and inserts (HELD for 10
+   minutes, or CONFIRMED). `POST /api/appointments/:id/confirm` turns a running hold into a
+   booking. **Best
    fit:** the technician with the fewest skills is chosen first, so specialists stay free for work
    only they can do; ties go to whoever has the least booked that day.
 3. PostgreSQL is the final judge. Three `EXCLUDE USING gist` constraints on `tstzrange` periods
@@ -267,7 +272,7 @@ first version; the Scala backend was written with the same structure, so every f
 - **DIP is enforced:** `ArchitectureSpec` fails if a domain, application or port file imports an
   adapter, the HTTP layer, `play.api.mvc`, Anorm, JDBC, the driver or the SQL helpers. A
   deliberate violation was tried to confirm the test catches it.
-- **Checked:** `-Wunused:all -Werror` compiles clean; 95 tests pass; the 1000-request load test
+- **Checked:** `-Wunused:all -Werror` compiles clean; 95 tests passed at the time of that review; the 1000-request load test
   passes; the packaged server boots and the web app runs every page in a headless browser with no
   errors.
 
@@ -285,6 +290,31 @@ Metrics and the logger are shared across the system; request shapes (play-json `
 the use cases; ports take a `DbSession` so one use case can write several tables in one
 transaction; password hashing is a plain object; seed, migrations and `/health` run SQL directly
 because they are infrastructure tools. Details in `docs/solid-review.md`.
+
+### 6.4 Second review (26 October 2026)
+
+The features added after the first review (holds, workshop controller, parts, opening hours,
+package catalogue, tracing) were reviewed for readability and SOLID. The structure held: every new
+feature follows the module layout (controller → service → port → `Pg*` adapter), the new rules
+are tables (`Lifecycle.Transitions`, `PartOrderLifecycle`), database errors are still translated
+in adapters (`OutOfStockError` joins `SlotTakenError` and `VehicleBusyError`), and
+`ArchitectureSpec` still passes. No violation of the kind fixed in 6 came back.
+
+Smaller findings, none of which changes behaviour:
+
+| Finding | Principle | Where |
+| --- | --- | --- |
+| `BookingService.book` is about 110 lines with two nested closures | SRP, readability | `BookingService.scala` |
+| "The caller's dealership or 403" is written five times; releasing expired holds three times (`DispatchService` does not count the `holds{expired}` metric) | DRY | scheduling, admin, parts services |
+| `WorkshopAdminService` and `TenantService` take the concrete `IdentityService` instead of a narrow trait | DIP, ISP | admin, system |
+| `consultation` and `scheduling` import each other (`BookableConsultation` lives in consultation, the port in scheduling) | Module boundaries | both modules |
+| `BookPage.tsx` is 594 lines with 13 pieces of state | SRP (frontend) | `frontend/src/pages/customer/BookPage.tsx` |
+
+The full list (13 findings with suggested fixes) is in `docs/code-review-2026-10-26.md`. The same
+review found the diagrams and the SRS still described the first release; they were redrawn and
+updated (HELD and EXPIRED in the state diagram, use cases UC12, UC34, UC35, UC42, UC53, UC62, UC70,
+UC71, the parts tables in the ERD and domain model, the new services in the class and hexagonal
+diagrams).
 
 ## 7. Websites surveyed
 

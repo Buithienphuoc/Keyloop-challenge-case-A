@@ -67,10 +67,10 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
 | UC09 Cancel an appointment | `POST /api/appointments/:id/cancel` | My appointments | `ApiSpec` › cancel before the start frees the slot; too late after | Done |
 | UC10 Withdraw a request | `POST /api/consultations/:id/cancel` | Advice requests | `ApiSpec` › UC10 | Done |
 | UC11 Add to my calendar | none (client-side .ics) | Confirmation, My appointments | none | Done (UI) |
+| UC12 Hold a time, then confirm | `POST /api/appointments/holds`, `POST /api/appointments/:id/confirm` | Book a service › review step with countdown | `FeaturesSpec` › temporary holds (6 tests) | Done |
 | UC20 Real-time availability | `GET /api/availability` | Slot grid, refresh 30 s | `AvailabilitySpec`, `AvailabilityPropertySpec` | Done |
 | UC21 Allocate bay and technician | inside `POST /api/appointments` | none | `BookingConcurrencySpec`, property tests, best-fit tests | Done |
 | UC22 Nearest alternatives | 409 `details.alternatives` | "Taken a moment ago" buttons | `ApiSpec` › nearest free alternatives | Done |
-| Order replacement parts | none | none | none | Future |
 | Reschedule | none (cancel and rebook) | none | none | Future |
 | Reminders (SMS / Zalo / email) | none | none | none | Future |
 
@@ -82,18 +82,23 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
 | UC31 Review an advice request | `GET /api/staff/consultations`, `POST /api/consultations/:id/review` | Advice requests (staff) | `ApiSpec` › advisor turns it into a schedulable job | Done |
 | UC32 Record start, completion, no-show | `POST /api/appointments/:id/status` | Board side panel | `ApiSpec` › technician workflow, no-show only after start | Done |
 | UC33 Cancel a booking | `POST /api/appointments/:id/cancel` | Board side panel | `ApiSpec` › UC33 | Done |
+| UC34 See the day's workload | `GET /api/staff/workload` | Workload | `FeaturesSpec` › workshop controller sees how loaded each technician and bay is; `WorkloadSpec` | Done |
+| UC35 Move a job | `POST /api/appointments/:id/reassign` | Workshop day › Move job | `FeaturesSpec` › moves a job to a free, qualified technician; never double-books | Done |
 | UC40 View my jobs | `GET /api/technician/jobs` | My jobs | `ApiSpec` › the technician sees the job | Done |
 | UC41 Start and finish a job | `POST /api/appointments/:id/status` | My jobs | `ApiSpec` › works through it; UC41 other technician's job → 403 | Done |
+| UC42 Order parts for a job | `POST /api/part-orders` | Parts › New order | `FeaturesSpec` › lets a technician order parts for a job | Done |
 | UC50 Manage service bays | `GET/POST /api/admin/bays`, `PATCH …/:id` | Bays & team › Service bays | `ApiSpec` › admin adds a bay; cannot touch another dealership | Done |
 | UC51 Manage technicians | `GET/POST /api/admin/technicians`, `PATCH …/:id` | Bays & team › Technicians | `ApiSpec` › admin adds a technician | **Partial**: add (skills, shift, days, login) and deactivate; no edit of an existing technician's skills or shift |
 | UC52 Manage staff accounts | `GET/POST /api/admin/staff` | Bays & team › Staff accounts | none | **Partial**: create and list; no deactivate or password reset |
+| UC53 Set opening hours and booking rules | `PUT /api/admin/opening-hours` | Bays & team › Opening hours | `FeaturesSpec` › applies new hours to availability at once | Done |
 | UC60 Onboard a dealership | `POST /api/system/dealerships` | Dealerships | `ApiSpec` › system manager onboards a dealership | Done |
 | UC61 Monitor dealerships | `GET /api/system/dealerships` | Dealerships | `ApiSpec` › UC61 | Done |
+| UC62 Manage the package catalogue | `GET/POST /api/system/packages`, `PATCH …/:id` | Packages | `FeaturesSpec` › adds a package customers can book, and retires it | Done |
+| UC70 Manage parts stock | `GET/POST /api/parts`, `POST /api/parts/:id/stock` | Parts › Stock | `FeaturesSpec` › keeps the shelf to parts staff and admins | Done |
+| UC71 Fulfil parts orders | `GET /api/part-orders`, `POST /api/part-orders/:id/status` | Parts › Orders | `FeaturesSpec` › parts staff order what is missing and issue it; never issues more than is on the shelf | Done |
 | Admin generalises advisor | role guard allows `ADMIN` on every advisor route | same screens | role tests | Done |
 | Book for a phone / walk-in customer | none | none | none | Future |
-| Manage packages and prices | none (seeded catalogue) | none | none | Future |
-| Opening hours, breaks, holidays | set at onboarding only | none | none | Future |
-| Workshop controller, parts staff | none | none | none | Future |
+| Breaks and holidays in shifts | none | none | none | Future |
 
 ### Activity steps checked against the code
 
@@ -104,12 +109,16 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
 | Free bay AND qualified technician on shift for the whole job | `domain/Availability.scala` `allocate`, `isOnShift`, `daySlots` |
 | Open the first day with a free time; refresh every 30 s | `BookPage` `autoPick`; `refetchInterval: 30_000` |
 | New Idempotency-Key per distinct attempt | `BookPage` regenerates the key when slot, vehicle, package or dealership change |
+| Hold for 10 minutes, then confirm | `BookingService.book(hold = true)`, `AppointmentService.confirmHold`; `HoldSweeper` every 30 s |
+| Expired holds never block a booking | `expireHolds(HoldScope.Around …)` inside the booking and job-move transactions |
+| A moved job keeps every booking rule | `DispatchService.reassign`: bay type, skill, shift; EXCLUDE constraints → 409 `RESOURCE_BUSY` |
+| Stock never below zero | `PartsService.changeStatus` → `applyStock` under row locks + `CHECK (stock_qty >= 0)` → 409 `OUT_OF_STOCK` |
 | Start-time rules (open day, grid, hours, lead time, max days) | `validateStart` → 422 with a code |
 | Best fit, retry on a lost race (≤ 5), then 409 with 3 alternatives | `BookingService.book`, `MaxAttempts = 5`, `AvailabilityService.nearest` |
 | EXCLUDE constraints on bay, technician, vehicle | `backend/conf/db/migration/V1__init.sql`; each tested on its own |
 | Advisor's bay type must fit the vehicle | `ConsultationService.review` → 422 `BAY_TYPE_NOT_FOR_VEHICLE` |
 | Request and appointment change in one transaction | `markBooked` inside the booking transaction |
-| Cancelling a consulted appointment re-opens the request | `changeStatus` → `consultations.reopen` |
+| Cancelling (or a hold expiring on) a consulted appointment re-opens the request | `changeStatus`, `confirmHold`, `expireHolds` → `consultations.reopen` |
 | No-show only after the start; cancel only before work starts | `domain/Lifecycle.scala` `checkTransition` |
 | A technician only moves their own jobs | `changeStatus` compares `technicianIdForUser` |
 | Audit row, log line and metric for every status change | `recordEvent`, `appointment.status_changed`, `appointment_status_changes_total` |
@@ -120,4 +129,14 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
    Added; the backend suite is now 95 tests (plus the 1000-request load test).
 2. **UC03, UC51, UC52 are partial** (see tables). Either build the missing edits or redraw these
    use cases with a narrower name before submission.
-3. Nothing in the code contradicts a drawn flow.
+3. **Starting a job is not tied to the date.** The workshop day diagram starts a job when the
+   vehicle has arrived, but the code only checks the transition and the role
+   (`Lifecycle.checkTransition` has time rules for no-show and customer cancels, none for
+   start), so staff can start a confirmed job days before it. The diagram now says so in a
+   note; whether the code should refuse is open (code review Q1). Found by the Selenium suite
+   (`docs/e2e-traceability.md`).
+4. **26 October 2026:** the diagrams were redrawn after the holds, workshop controller, parts,
+   opening hours and package catalogue features (V2 migration). Use cases UC12, UC34, UC35, UC42,
+   UC53, UC62, UC70, UC71 were added; the state diagram now has HELD and EXPIRED; moving a job
+   to another bay or technician is UC35 and the first step of the workshop day diagram. See
+   `docs/code-review-2026-10-26.md`.

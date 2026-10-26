@@ -16,13 +16,21 @@ package "scheduling.application" <<Rectangle>> {
     + nearest(rules, requirement, dealershipId, requested) : Seq[Slot]
   }
   class BookingService {
-    + book(auth, request, idempotencyKey, log) : BookingResult
+    + book(auth, request, idempotencyKey, log, hold) : BookingResult
     - replay(auth, key, log)
   }
   class AppointmentService {
     + get(auth, id) : AppointmentView
     + listMine(auth) / listForDealershipDay / listTechnicianDay
     + changeStatus(auth, id, to, reason, log) : AppointmentView
+    + confirmHold(auth, id, log) : AppointmentView
+  }
+  class DispatchService {
+    + workload(auth, date) : WorkloadView
+    + reassign(auth, id, move, log) : AppointmentView
+  }
+  class HoldSweeper {
+    + sweep() : Int  «every 30 s, SKIP LOCKED»
   }
   class WorkshopContext {
     + dealership(id) : Dealership
@@ -30,16 +38,17 @@ package "scheduling.application" <<Rectangle>> {
   }
   interface ResourceCalendar <<port>> {
     + activeResources(s, dealershipId)
-    + busyPeriods(s, dealershipId, from, to)
+    + busyPeriods(s, dealershipId, from, to, asOf)
   }
   interface AppointmentReader <<port>> {
     + get(s, id) / list(s, filter)
-    + technicianIdForUser(s, userId)
+    + technicianIdForUser(s, userId) / jobDetails(s, id)
   }
   interface AppointmentWriter <<port>> {
     + insert(s, appt) : id  «throws SlotTakenError, VehicleBusyError»
     + lockIdempotencyKey / findIdByIdempotencyKey
     + lockForUpdate / setStatus / recordEvent
+    + expireHolds(s, asOf, scope) / reassign(s, id, bay, tech)
   }
   interface ConsultationBookingPort <<port>> {
     + forBooking(s, id) / markBooked(s, id) / reopen(s, id)
@@ -84,10 +93,26 @@ package "identity" <<Rectangle>> {
 }
 
 package "admin · system" <<Rectangle>> {
-  class WorkshopAdminService
-  class TenantService
+  class WorkshopAdminService {
+    + bays / technicians / staff / updateHours
+  }
+  class TenantService {
+    + list / onboard
+  }
+  class PackageAdminService {
+    + list / create / update
+  }
   interface WorkshopRepository <<port>>
   interface TenantRepository <<port>>
+  interface PackageRepository <<port>>
+}
+
+package "parts" <<Rectangle>> {
+  class PartsService {
+    + listParts / addPart / adjustStock
+    + createOrder / listOrders / changeStatus
+  }
+  interface PartsRepository <<port>>
 }
 
 package "shared" <<Rectangle>> {
@@ -104,6 +129,8 @@ package "adapters (PostgreSQL)" <<Rectangle>> {
   class PgCatalogRepo
   class PgIdentityRepo
   class "PgWorkshopRepo · PgTenantRepo" as PgAdmin
+  class PgPackageRepo
+  class PgPartsRepo
 }
 
 AvailabilityService --> ResourceCalendar
@@ -118,6 +145,13 @@ BookingService --> AvailabilityService : nearest()
 AppointmentService --> AppointmentReader
 AppointmentService --> AppointmentWriter
 AppointmentService --> ConsultationBookingPort : reopen
+DispatchService --> ResourceCalendar
+DispatchService --> AppointmentReader
+DispatchService --> AppointmentWriter
+DispatchService --> ConsultationBookingPort : reopen
+DispatchService --> WorkshopContext
+HoldSweeper --> AppointmentWriter : expireHolds
+HoldSweeper --> ConsultationBookingPort : reopen
 WorkshopContext --> CatalogReader
 WorkshopContext --> ConsultationBookingPort
 
@@ -134,6 +168,8 @@ WorkshopAdminService --> WorkshopRepository
 WorkshopAdminService --> IdentityService : createUser in tx
 TenantService --> TenantRepository
 TenantService --> IdentityService : first admin in tx
+PackageAdminService --> PackageRepository
+PartsService --> PartsRepository
 
 PgSchedulingStore ..|> ResourceCalendar
 PgSchedulingStore ..|> AppointmentReader
@@ -145,6 +181,8 @@ PgIdentityRepo ..|> UserRepository
 PgIdentityRepo ..|> SessionRepository
 PgAdmin ..|> WorkshopRepository
 PgAdmin ..|> TenantRepository
+PgPackageRepo ..|> PackageRepository
+PgPartsRepo ..|> PartsRepository
 
-note "Wiring lives in AppComponents (AppLoader.scala) only.\nServices that write in a transaction also receive Db.\nHTTP controllers (not shown) call the services; the guard\nsees only Authenticator." as N1
+note "Wiring lives in AppComponents (AppLoader.scala) only;\nit also schedules HoldSweeper on a virtual thread.\nServices that write in a transaction also receive Db.\nHTTP controllers (not shown) call the services; the guard\nsees only Authenticator." as N1
 @enduml

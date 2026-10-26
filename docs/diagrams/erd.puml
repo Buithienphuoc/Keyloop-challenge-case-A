@@ -1,6 +1,6 @@
 @startuml erd
 !include _style.iuml
-title Entity relationship diagram (PostgreSQL schema, backend/conf/db/migration/V1__init.sql + Flyway)
+title Entity relationship diagram (PostgreSQL schema, backend/conf/db/migration/V1__init.sql + V2__holds_dispatch_parts.sql + Flyway)
 hide circle
 hide methods
 skinparam linetype ortho
@@ -29,7 +29,8 @@ entity "users" as users AUTH {
   * password_hash : text (PBKDF2-SHA512)
   * full_name : text
   phone : text
-  * role : CUSTOMER | SERVICE_ADVISOR | TECHNICIAN | ADMIN | SYSTEM_MANAGER
+  * role : CUSTOMER | SERVICE_ADVISOR | TECHNICIAN | ADMIN
+    | SYSTEM_MANAGER | WORKSHOP_CONTROLLER | PARTS_STAFF
   dealership_id : uuid <<FK>> (staff only)
   * is_active : boolean
   * created_at : timestamptz
@@ -173,7 +174,9 @@ entity "appointments" as appts DOMAIN {
   * bay_id : uuid <<FK (bay_id, dealership_id)>>
   * technician_id : uuid <<FK (technician_id, dealership_id)>>
   * period : tstzrange [start, end)
-  * status : CONFIRMED | IN_PROGRESS | COMPLETED | CANCELLED | NO_SHOW
+  * status : HELD | CONFIRMED | IN_PROGRESS | COMPLETED
+    | CANCELLED | NO_SHOW | EXPIRED
+  hold_expires_at : timestamptz (required while HELD)
   customer_note : text
   idempotency_key : text <<UQ per customer>>
   * created_by : uuid <<FK>>
@@ -181,7 +184,7 @@ entity "appointments" as appts DOMAIN {
   cancel_reason : text
   ..
   EXCLUDE bay / technician / vehicle overlap
-  while CONFIRMED or IN_PROGRESS
+  while HELD, CONFIRMED or IN_PROGRESS
 }
 
 entity "appointment_events" as events DOMAIN {
@@ -192,6 +195,51 @@ entity "appointment_events" as events DOMAIN {
   * to_status : text
   * actor_id : uuid <<FK>>
   note : text
+  * at : timestamptz
+}
+
+entity "parts" as parts DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * dealership_id : uuid <<FK>>
+  * sku : text <<UQ per dealership>>
+  * name : text
+  * unit_price : integer
+  * currency : text
+  * stock_qty : integer CHECK >= 0
+  * is_active : boolean
+  * created_at : timestamptz
+}
+
+entity "part_orders" as porders DOMAIN {
+  * id : uuid <<PK>>
+  --
+  * reference : text <<UQ>>
+  * dealership_id : uuid <<FK>>
+  appointment_id : uuid <<FK>>
+  * status : REQUESTED | ORDERED | RECEIVED
+    | ISSUED | CANCELLED
+  note : text
+  * requested_by : uuid <<FK>>
+  * created_at, updated_at : timestamptz
+}
+
+entity "part_order_lines" as plines DOMAIN {
+  * order_id : uuid <<PK, FK>>
+  * part_id : uuid <<PK, FK (part_id, dealership_id)>>
+  --
+  * dealership_id : uuid
+  * quantity : integer > 0
+  * unit_price : integer
+}
+
+entity "part_order_events" as pevents DOMAIN {
+  * id : bigserial <<PK>>
+  --
+  * order_id : uuid <<FK>>
+  from_status : text
+  * to_status : text
+  * actor_id : uuid <<FK>>
   * at : timestamptz
 }
 
@@ -223,6 +271,14 @@ bays ||--o{ appts
 techs ||--o{ appts
 appts ||--o{ events : "audit trail"
 users ||--o{ events : "actor"
+
+dealerships ||--o{ parts : "stocks"
+dealerships ||--o{ porders
+appts |o--o{ porders : "parts for the job"
+users ||--o{ porders : "requested_by"
+porders ||--|{ plines : "lines"
+parts ||--o{ plines
+porders ||--o{ pevents : "audit trail"
 
 note bottom of flyway
   Created and owned by Flyway, which runs the

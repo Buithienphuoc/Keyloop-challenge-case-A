@@ -4,8 +4,8 @@
 
 | | |
 | --- | --- |
-| Version | 1.0 |
-| Date | 25 October 2026 |
+| Version | 1.1 |
+| Date | 26 October 2026 |
 | Status | Delivered build `service-scheduler` 0.2.0 |
 | Readers | The client (dealership and platform owners) and future development teams |
 
@@ -24,16 +24,20 @@ separate Technical Document.
 Customers book a service appointment for their motorbike or car at a dealership. The system only
 offers a time when a **service bay of the right type** and a **technician with the right skill,
 on shift**, are both free for the **whole job**, and it makes double booking impossible even when
-many people press "Book" at the same moment. Dealership staff run the workshop day, answer advice
-requests, and manage bays, technicians and staff accounts. A platform manager onboards new
-dealerships.
+many people press "Book" at the same moment. The chosen time is held for 10 minutes while the
+customer reviews it. Dealership staff run the workshop day, answer advice requests, move jobs
+between bays and technicians, order and issue replacement parts, and manage bays, technicians,
+staff accounts and opening hours. A platform manager onboards new dealerships and keeps the
+service package catalogue.
 
 ### 1.3 Scope
 
-In scope: customer booking of maintenance packages; advice requests (inspection on request and
-customisation) that an advisor turns into a bookable job; appointment lifecycle; workshop-day
-board; technician job list; management of bays, technicians and staff; multi-dealership
-onboarding; REST API with an OpenAPI contract; logging, metrics and health checks.
+In scope: customer booking of maintenance packages with a 10-minute hold before confirming;
+advice requests (inspection on request and customisation) that an advisor turns into a bookable
+job; appointment lifecycle; workshop-day board; workload view and job moves for the workshop
+controller; replacement parts stock and orders; technician job list; management of bays,
+technicians, staff and opening hours; the service package catalogue; multi-dealership onboarding;
+REST API with an OpenAPI contract; logging, metrics, tracing and health checks.
 
 Out of scope for this version: section 12.
 
@@ -50,6 +54,8 @@ Out of scope for this version: section 12.
 | Capacity | The number of (bay, technician) pairs free for the whole job at a slot |
 | D+1 | The next day a dealership is open |
 | Idempotency key | A client-chosen header value that makes a repeated booking request return the first result instead of booking again |
+| Hold | A time reserved for one customer for 10 minutes (status HELD) while they review it. It takes the bay, technician and vehicle like a booking. Confirming makes it CONFIRMED; otherwise it becomes EXPIRED and the time is free again |
+| Parts order | A request for replacement parts at one dealership, usually for a booked job: REQUESTED → ORDERED → RECEIVED → ISSUED (or CANCELLED) |
 
 ### 1.5 References
 
@@ -80,8 +86,10 @@ further by scheduling bays and technicians rather than advisors only.
 | Customer | Vehicle owner, often with little technical knowledge | Book a trustworthy slot quickly; ask for advice when unsure what the vehicle needs |
 | Service advisor | Front desk of one dealership | Run the workshop day; turn advice requests into schedulable jobs |
 | Technician | Mechanic at one dealership | See today's jobs and record start and finish |
-| Dealership admin | Manager of one dealership | Everything an advisor does, plus keep bays, technicians and staff accurate |
-| System manager | Platform operator | Onboard dealerships and monitor their capacity |
+| Dealership admin | Manager of one dealership | Everything an advisor does, plus keep bays, technicians, staff and opening hours accurate, move jobs and run the parts shelf |
+| Workshop controller | Plans the workshop floor of one dealership | See how loaded each bay and technician is; move a job when someone is off or a bay is down |
+| Parts staff | Runs the parts counter of one dealership | Keep stock levels right; order, receive and issue the parts that jobs need |
+| System manager | Platform operator | Onboard dealerships, monitor their capacity and keep the service package catalogue |
 
 ### 2.3 Operating environment
 
@@ -99,6 +107,8 @@ further by scheduling bays and technicians rather than advisors only.
 - Bookings open at least 60 minutes ahead and up to 60 days ahead (both configurable per dealership).
 - Bay types limit vehicle types: motorbike stand → motorbikes, car lift → cars, diagnostic bay → both.
 - Customers book for themselves; staff manage bookings but do not create them in this version.
+- A hold lasts 10 minutes (`HOLD_MINUTES`); lapsed holds are released by the next booking that
+  needs the time and by a background sweeper every 30 seconds (`HOLD_SWEEP_SECONDS`).
 - Prices are in VND. All times are shown in the dealership's own time zone.
 
 ## 3. Functional requirements
@@ -123,9 +133,10 @@ test in the Test Specification.
 | --- | --- | --- | --- | --- | --- |
 | FR-10 | A customer can add vehicles (type, make, model, plate, optional year, mileage, 17-character VIN) and list them. A plate is unique per owner | UC03 | M | Partial (no edit or delete) | TC-CUS-01 |
 | FR-11 | A customer can book a maintenance package in four steps: vehicle → package (only packages for that vehicle type) → dealership and time → confirm, with an optional note for the technician | UC04 | M | Done | TC-CUS-03 |
+| FR-11a | Moving to the confirm step holds the chosen time for 10 minutes with a visible countdown. "Confirm booking" turns the hold into a booking; a hold that ran out is refused (`409 HOLD_EXPIRED`) and the customer can try to hold the time again. Changing the time releases the earlier hold | UC12 | S | Done | `FeaturesSpec` › temporary holds; e2e `BookingJourneySpec` |
 | FR-12 | The time step shows, for each start time, whether it is free, how many places are left when only one is, and why it is not bookable (full, too soon, not open yet). It opens on the first day that still has a free time and refreshes every 30 seconds | UC20 | M | Done | TC-CUS-03 |
 | FR-13 | If the dealership has no bay or qualified technician for the job at all, the customer is told so and offered no times | UC20 | M | Done | TC-CUS-05, TC-SYS-03 |
-| FR-14 | If the chosen time is taken while the customer is confirming, the booking is refused and the three nearest free times are offered | UC22 | M | Done | TC-CUS-04 |
+| FR-14 | If the chosen time is taken before the customer could hold it, the hold is refused and the three nearest free times are offered | UC22 | M | Done | TC-CUS-04 |
 | FR-15 | A confirmed booking shows a reference (`SV-XXXXXX`), the technician and the dealership, and can be added to a calendar (.ics) | UC11 | S | Done (UI) | TC-CUS-03 |
 | FR-16 | A customer sees upcoming and past appointments and can cancel one until its start time | UC08, UC09 | M | Done | TC-CUS-06 |
 | FR-17 | A customer can send an advice request (inspection or customisation) for a vehicle at a dealership, choosing the areas concerned and describing it (10–2000 characters) | UC05, UC06 | M | Done | TC-CUS-07, 08 |
@@ -141,6 +152,7 @@ test in the Test Specification.
 | FR-32 | An advisor records that work started, that it is done, or that the customer did not come (only after the start time) | UC32 | M | Done | TC-ADV-03 |
 | FR-33 | An advisor can cancel a booking before work starts | UC33 | M | Done | TC-ADV-04 |
 | FR-34 | An advisor reviews advice requests of the dealership: approve with duration, skill, bay type (compatible with the vehicle), optional estimate and message; or decline with a reason of at least 5 characters | UC31 | M | Done | TC-ADV-05, 06 |
+| FR-35 | An advisor, technician, workshop controller or admin can order replacement parts, optionally for a booked job of the dealership | UC42 | S | Done | `FeaturesSpec` › replacement parts; e2e `BookingJourneySpec` |
 
 ### 3.4 Technician
 
@@ -149,6 +161,20 @@ test in the Test Specification.
 | FR-40 | A technician sees their own jobs for a day, with the checklist and the customer's note | UC40 | M | Done | TC-TEC-01 |
 | FR-41 | A technician starts and finishes their own jobs; they cannot move another technician's jobs | UC41 | M | Done | TC-TEC-02 |
 
+### 3.4a Workshop controller
+
+| ID | Requirement | UC | Priority | Status | Test |
+| --- | --- | --- | --- | --- | --- |
+| FR-45 | A workshop controller (and an advisor or admin) sees, for one day, how many minutes each bay and each technician is booked against their open or shift time | UC34 | S | Done | `FeaturesSpec` › workshop controller; `WorkloadSpec` |
+| FR-46 | A workshop controller or admin moves a confirmed job to another bay, technician or both, with an optional reason. The new bay must be of the job's type, the technician must have the skill and be on shift for the whole job, and neither may be busy then (`409 RESOURCE_BUSY`). The move is recorded in the audit trail | UC35 | S | Done | `FeaturesSpec` › moves a job; never double-books |
+
+### 3.4b Parts staff
+
+| ID | Requirement | UC | Priority | Status | Test |
+| --- | --- | --- | --- | --- | --- |
+| FR-47 | Parts staff (and admins) add parts (SKU, name, price, stock) and adjust stock; stock can never go below zero | UC70 | S | Done | `FeaturesSpec` › keeps the shelf to parts staff and admins |
+| FR-48 | Parts staff move an order REQUESTED → ORDERED → RECEIVED → ISSUED, or cancel it. Issuing takes the parts off the shelf; if there is not enough, it is refused (`409 OUT_OF_STOCK`), even when two people issue the last unit at once | UC71 | S | Done | `FeaturesSpec` › never issues more than is on the shelf |
+
 ### 3.5 Dealership admin
 
 | ID | Requirement | UC | Priority | Status | Test |
@@ -156,7 +182,8 @@ test in the Test Specification.
 | FR-50 | An admin has every advisor permission | — | M | Done | TC-ADM-01 |
 | FR-51 | An admin adds bays and takes them out of service or back; out-of-service bays are never offered | UC50 | M | Done | TC-ADM-02 |
 | FR-52 | An admin adds technicians with skills, shift times, working days and an optional login, and deactivates or reactivates them | UC51 | M | Partial (no edit of an existing technician) | TC-ADM-03 |
-| FR-53 | An admin creates staff accounts (service advisor or admin) for their dealership | UC52 | S | Partial (no deactivate or password reset) | TC-ADM-04 |
+| FR-53 | An admin creates staff accounts (service advisor, admin, workshop controller or parts staff) for their dealership | UC52 | S | Partial (no deactivate or password reset) | TC-ADM-04 |
+| FR-54 | An admin sets opening and closing time, open days, slot size, minimum lead time and booking horizon. New bookings follow them at once; existing bookings are kept and the admin is told how many now fall outside the hours | UC53 | S | Done | `FeaturesSpec` › opening hours; e2e `BackOfficeSpec` |
 
 ### 3.6 System manager
 
@@ -164,22 +191,25 @@ test in the Test Specification.
 | --- | --- | --- | --- | --- | --- |
 | FR-60 | A system manager onboards a dealership (code, name, address, IANA time zone, hours, open days) together with its first admin, in one step | UC60 | M | Done | TC-SYS-02 |
 | FR-61 | A system manager sees every dealership with its hours, active bays, active technicians and upcoming appointments (the API also returns the number of staff accounts) | UC61 | S | Done | TC-SYS-01 |
+| FR-62 | A system manager adds service packages (name, vehicle type, price, duration, skill, bay type, checklist), edits them and retires them; customers can book a new package at once | UC62 | S | Done | `FeaturesSpec` › service package catalogue; e2e `BackOfficeSpec` |
 
 ## 4. Business rules
 
 | ID | Rule | Enforced in |
 | --- | --- | --- |
-| BR-01 | A bay, a technician and a vehicle can never have two live appointments (Confirmed or In the workshop) whose times overlap. Times are half-open, so 09:00–10:00 and 10:00–11:00 do not overlap | Three PostgreSQL `EXCLUDE USING gist` constraints; also checked in code before inserting |
+| BR-01 | A bay, a technician and a vehicle can never have two live appointments (Held, Confirmed or In the workshop) whose times overlap. Times are half-open, so 09:00–10:00 and 10:00–11:00 do not overlap | Three PostgreSQL `EXCLUDE USING gist` constraints; also checked in code before inserting |
 | BR-02 | A job is only offered when a bay of the required type and a technician with the required skill, on shift on that weekday, are free for the whole duration | `domain/Availability.scala` |
 | BR-03 | Best fit: among free technicians, the one with the fewest skills is chosen; ties go to the one with the least booked minutes that day. Specialists stay free for work only they can do | `Availability.allocate` |
-| BR-04 | A start time must be on an open day, on the slot grid, inside opening hours, at least `min_lead_minutes` ahead and at most `max_days_ahead` days ahead; the job must end by closing | `BookingService.validateStart`, the same rules in the slot grid |
-| BR-05 | Lifecycle: Confirmed → In the workshop → Done; Confirmed → Cancelled (before work starts); Confirmed → Missed (no-show, only after the start). No way back from Done, Cancelled or Missed | `domain/Lifecycle.scala` |
-| BR-06 | A customer may only cancel; a technician may only start and finish their own jobs; advisors and admins may do all four moves at their dealership; a system manager may not move appointments | `Lifecycle.roleMayMoveTo`, `AppointmentService` |
+| BR-04 | A start time must be on an open day, on the slot grid, inside opening hours, at least `min_lead_minutes` ahead and at most `max_days_ahead` days ahead; the job must end by closing | `Availability.validateStart` (called by `BookingService`), the same rules in the slot grid |
+| BR-05 | Lifecycle: Held → Confirmed (by the customer, before the hold runs out); Held → Cancelled (released) or Expired (ran out); Confirmed → In the workshop → Done; Confirmed → Cancelled (before work starts); Confirmed → Missed (no-show, only after the start). No way back from Done, Cancelled, Missed or Expired | `domain/Lifecycle.scala`, `AppointmentService.confirmHold` |
+| BR-06 | A customer may only confirm and cancel; a technician may only start and finish their own jobs; advisors and admins may do all four staff moves at their dealership; workshop controllers, parts staff and the system manager may not change a status | `Lifecycle.roleMayMoveTo`, `AppointmentService` |
 | BR-07 | An appointment is either for a package or for an approved advice request, never both. One advice request has at most one live booking | Database `CHECK` and partial unique index |
-| BR-08 | Cancelling the appointment of an advice request re-opens the request, so the customer can pick another time | `AppointmentService` |
+| BR-08 | Cancelling the appointment of an advice request, or its hold expiring, re-opens the request, so the customer can pick another time | `AppointmentService`, `HoldSweeper`, `expireHolds` |
 | BR-09 | An approved advice request must carry duration, skill and bay type, and the bay type must accept the vehicle type | Database `CHECK`; `ConsultationService.review` |
 | BR-10 | The same `Idempotency-Key` from the same customer never creates a second appointment; the repeat returns the first one | Unique index `(customer_id, idempotency_key)` and an advisory lock |
-| BR-11 | Every status change is recorded with who, when, from and to | `appointment_events` |
+| BR-11 | Every status change and every job move is recorded with who, when, from and to | `appointment_events`, `part_order_events` |
+| BR-12 | A moved job keeps every booking rule: bay of the job's type, technician with the skill and on shift for the whole job, no overlap | `DispatchService.reassign`, the BR-01 constraints |
+| BR-13 | Parts stock never goes below zero; a parts order line uses a part of the order's own dealership | `CHECK (stock_qty >= 0)`, composite foreign key, row locks in `PgPartsRepo` |
 
 ## 5. Non-functional requirements
 
@@ -190,10 +220,10 @@ test in the Test Specification.
 | NFR-03 | Scalability | The API keeps no state in memory, so more instances can run behind a load balancer | Sessions and locks live in PostgreSQL; BR-01 holds across instances |
 | NFR-04 | Security | Passwords hashed with PBKDF2-HMAC-SHA512 and a per-user salt; bearer tokens stored only as SHA-256 hashes; tokens revocable; role and dealership checked on every call; no secrets in logs | `Passwords.scala`, `ApiSpec` role and isolation tests |
 | NFR-05 | Reliability | Deadlocks and lost races are retried (up to 5 attempts); transient database errors answer `503` with `Retry-After` | `BookingServiceFakesSpec`, error handler |
-| NFR-06 | Observability | One JSON log line per event with request ID, user, role and dealership; Prometheus metrics; health check; slow-query log over 200 ms | `/metrics`, `/health`, TC-OPS-01 to 04 |
+| NFR-06 | Observability | One JSON log line per event with request ID, trace ID, user, role and dealership; Prometheus metrics; OpenTelemetry traces (request, booking attempt and SQL spans, exported over OTLP); health check; slow-query log over 200 ms | `/metrics`, `/health`, TC-OPS-01 to 04, `FeaturesSpec` › tracing |
 | NFR-07 | Traceability | Every response and error carries an `X-Request-Id`; the UI shows it for unexpected errors | `ApiSpec` › request-ID propagation |
 | NFR-08 | Maintainability | Hexagonal modules; inner layers never import adapters, HTTP, JDBC or Anorm; compiles with `-Wunused:all -Werror` | `ArchitectureSpec` |
-| NFR-09 | Testability | 95 automated tests on the real database engine, including property-based tests over thousands of random workshops | `npm test` |
+| NFR-09 | Testability | Backend unit, property and integration tests on the real database engine (including property-based tests over thousands of random workshops), plus Selenium end-to-end tests in Chrome on every pull request | `sbt test` in `backend/`, `sbt test` in `e2e/` |
 | NFR-10 | Usability | Customer flow works on phones and desktops; availability opens on the first free day; plain-language errors | Verified in a headless browser at desktop and phone sizes |
 | NFR-11 | Time zones | Every dealership has its own IANA time zone; slot times stay correct across daylight-saving changes | `AvailabilitySpec` (Europe/London) |
 | NFR-12 | API contract | Every route is documented in OpenAPI 3.1 | `ApiSpec` fails if a route is missing from `openapi.yaml` |
@@ -210,11 +240,14 @@ test in the Test Specification.
 | My appointments | `/appointments` | Customer |
 | Advice requests, new request | `/requests`, `/requests/new?kind=INSPECTION|MODIFICATION` | Customer |
 | My vehicles | `/vehicles` | Customer |
-| Workshop day | `/staff/board` | Service advisor, admin |
+| Workshop day | `/staff/board` | Service advisor, admin, workshop controller |
+| Workload | `/staff/workload` | Service advisor, admin, workshop controller |
+| Parts | `/parts` | Service advisor, technician, admin, workshop controller, parts staff |
 | Advice requests (staff) | `/staff/requests` | Service advisor, admin |
 | Bays & team | `/admin` | Admin |
 | My jobs | `/jobs` | Technician |
 | Dealerships | `/system` | System manager |
+| Service packages | `/system/packages` | System manager |
 
 Screenshots of every screen are in the Test Specification.
 
@@ -235,13 +268,17 @@ ISO-8601 with offset. The full contract with request and response schemas is ser
 | GET | `/api/reference-data` | Inspection areas, skills, bay types | Signed in |
 | GET, POST | `/api/me/vehicles` | List or add own vehicles | Customer |
 | GET | `/api/availability` | Slot grid for a dealership, date and package or approved request | Customer, advisor, admin |
-| POST | `/api/appointments` | Book (optional `Idempotency-Key`) | Customer |
+| POST | `/api/appointments` | Book straight to CONFIRMED (optional `Idempotency-Key`) | Customer |
+| POST | `/api/appointments/holds` | Hold a time for 10 minutes (optional `Idempotency-Key`) | Customer |
+| POST | `/api/appointments/:id/confirm` | Confirm a hold | Customer (own) |
+| POST | `/api/appointments/:id/reassign` | Move a job to another bay and/or technician | Workshop controller, admin |
 | GET | `/api/me/appointments` | Own appointments | Customer |
 | GET | `/api/appointments/:id` | One appointment | Owner, staff of its dealership |
 | POST | `/api/appointments/:id/cancel` | Cancel | Customer (own, before start), advisor, admin |
 | POST | `/api/appointments/:id/status` | Start, finish, no-show | Advisor, admin, technician (own) |
-| GET | `/api/staff/appointments` | One day at the dealership | Advisor, admin |
-| GET | `/api/staff/resources` | Active bays and technicians | Advisor, admin |
+| GET | `/api/staff/appointments` | One day at the dealership | Advisor, admin, workshop controller |
+| GET | `/api/staff/workload` | Booked minutes per bay and technician for a day | Workshop controller, advisor, admin |
+| GET | `/api/staff/resources` | Active bays and technicians | Advisor, admin, workshop controller |
 | GET | `/api/technician/jobs` | Own jobs for a day | Technician |
 | POST | `/api/consultations` | Send an advice request | Customer |
 | GET | `/api/me/consultations` | Own advice requests | Customer |
@@ -254,19 +291,26 @@ ISO-8601 with offset. The full contract with request and response schemas is ser
 | GET, POST | `/api/admin/technicians` | List or add technicians | Admin |
 | PATCH | `/api/admin/technicians/:id` | Activate or deactivate | Admin |
 | GET, POST | `/api/admin/staff` | List or add staff accounts | Admin |
+| PUT | `/api/admin/opening-hours` | Opening hours and booking rules | Admin |
 | GET, POST | `/api/system/dealerships` | List or onboard dealerships | System manager |
+| GET, POST | `/api/system/packages` | List or add service packages | System manager |
+| PATCH | `/api/system/packages/:id` | Edit or retire a package | System manager |
+| GET | `/api/parts` | The dealership's parts and stock | Advisor, technician, admin, workshop controller, parts staff |
+| POST | `/api/parts`, `/api/parts/:id/stock` | Add a part, adjust stock | Parts staff, admin |
+| GET, POST | `/api/part-orders` | List or raise parts orders | Advisor, technician, admin, workshop controller, parts staff |
+| POST | `/api/part-orders/:id/status` | Order, receive, issue or cancel | Parts staff, admin |
 | GET | `/health` | Database check | Anyone |
 | GET | `/metrics` | Prometheus metrics | Operator |
 | GET | `/docs`, `/docs/openapi.yaml` | Swagger UI and the contract | Anyone |
 
 Main status codes: `201` created, `200` idempotent replay, `401` not signed in, `403` wrong role or
 dealership, `404` not found or not yours, `409 SLOT_UNAVAILABLE` (with `details.alternatives`),
-`409 TOO_LATE_TO_CANCEL`, `422` validation (`NOT_ON_SLOT_GRID`, `TOO_SOON`, `NOT_OFFERED_HERE`,
+`409 TOO_LATE_TO_CANCEL`, `409 HOLD_EXPIRED`, `409 RESOURCE_BUSY`, `409 OUT_OF_STOCK`, `422` validation (`NOT_ON_SLOT_GRID`, `TOO_SOON`, `NOT_OFFERED_HERE`,
 `PACKAGE_NOT_FOR_VEHICLE`, …), `503 TRY_AGAIN`.
 
 ## 7. Data model
 
-The schema has 14 tables in three groups. The entity relationship diagram colours them:
+The schema has 18 tables in three groups (migrations `V1__init.sql` and `V2__holds_dispatch_parts.sql`). The entity relationship diagram colours them:
 **green** for the business domain, **red** for authentication and authorisation, **orange** for
 framework infrastructure.
 
@@ -281,8 +325,11 @@ framework infrastructure.
 | Business domain | `service_packages` | The catalogue: price, duration, skill, bay type, checklist |
 | Business domain | `vehicles` | Customers' vehicles |
 | Business domain | `consultation_requests` | Advice requests and the advisor's decision |
-| Business domain | `appointments` | Bookings, with the period as `tstzrange` and the three exclusion constraints |
-| Business domain | `appointment_events` | Audit trail of every status change |
+| Business domain | `appointments` | Bookings and holds, with the period as `tstzrange`, `hold_expires_at`, and the three exclusion constraints (HELD, CONFIRMED, IN_PROGRESS) |
+| Business domain | `appointment_events` | Audit trail of every status change and job move |
+| Business domain | `parts` | Parts stock per dealership; `stock_qty` can never be negative |
+| Business domain | `part_orders`, `part_order_lines` | Parts orders, optionally for an appointment, and their lines |
+| Business domain | `part_order_events` | Audit trail of parts order status changes |
 | Authentication and authorisation | `users` | Every account, its role and (for staff) its dealership; password hash |
 | Authentication and authorisation | `sessions` | SHA-256 hashes of bearer tokens, expiry, revocation |
 | Framework infrastructure | `flyway_schema_history` | Applied migrations, written by Flyway when the Play application starts |
@@ -301,15 +348,16 @@ PostgreSQL. `AppLoader` is the only place that decides which adapter implements 
 
 | Module | Responsibility |
 | --- | --- |
-| `scheduling` | Availability, booking, appointment lifecycle |
+| `scheduling` | Availability, holds and booking, appointment lifecycle, workload and job moves, the hold sweeper |
 | `consultation` | Advice requests and their review |
 | `vehicles` | Customers' vehicles |
 | `catalog` | Dealerships, packages, reference data |
 | `identity` | Accounts, passwords, sessions, the auth guard |
-| `admin` | Bays, technicians and staff of a dealership |
-| `system` | Dealership onboarding and monitoring |
+| `admin` | Bays, technicians, staff and opening hours of a dealership |
+| `parts` | Parts stock and parts orders |
+| `system` | Dealership onboarding and monitoring, the service package catalogue |
 | `shared` | Configuration, logging, errors, database port and pool, metrics, migrations |
-| `http` | Request IDs, error format, request logging, `/health`, `/metrics`, `/docs` |
+| `http` | Request IDs, trace spans, error format, request logging, `/health`, `/metrics`, `/docs` |
 
 ## 9. Diagrams
 
@@ -318,18 +366,18 @@ Graphviz (`.dot`) sources. Solid shapes are built; dashed grey shapes are future
 
 | # | Diagram | File | Shows |
 | --- | --- | --- | --- |
-| 1 | Use cases, customer | `use-case-customer.png` | UC01–UC11, UC20–UC22 |
-| 2 | Use cases, staff | `use-case-staff.png` | UC30–UC61 for advisor, technician, admin, system manager |
-| 3 | Activity, book a maintenance package | `activity-book-package.png` | The main customer flow with its checks |
+| 1 | Use cases, customer | `use-case-customer.png` | UC01–UC12, UC20–UC22 |
+| 2 | Use cases, staff | `use-case-staff.png` | UC30–UC71 for advisor, technician, workshop controller, parts staff, admin, system manager |
+| 3 | Activity, book a maintenance package | `activity-book-package.png` | The main customer flow with its checks, the hold and the confirm |
 | 4 | Activity, inspection or customisation | `activity-consult-first.png` | Consult first, then book |
-| 5 | Activity, the workshop day | `activity-workshop-day.png` | Advisor and technician during the day |
+| 5 | Activity, the workshop day | `activity-workshop-day.png` | Workshop controller, advisor and technician during the day |
 | 6 | State, appointment lifecycle | `state-appointment.png` | Statuses and who may move between them |
 | 7 | Data flow, level 0 | `dfd-context.png` | The system and its external entities |
-| 8 | Data flow, level 1 | `dfd-level1.png` | Seven processes and eight data stores |
+| 8 | Data flow, level 1 | `dfd-level1.png` | Nine processes and nine data stores |
 | 9 | Class, domain model | `class-domain-model.png` | Persisted entities with multiplicities |
 | 10 | Class, application layer | `class-application.png` | Services, ports and their PostgreSQL adapters |
 | 11 | Hexagonal architecture | `hexagonal-architecture.png` | Modules, ports and adapters as built |
-| 12 | Entity relationship | `erd.png` | All 14 tables, colour-coded by group |
+| 12 | Entity relationship | `erd.png` | All 18 tables, colour-coded by group |
 
 ![Use cases, customer](diagrams/use-case-customer.png)
 
@@ -364,6 +412,8 @@ Graphviz (`.dot`) sources. Solid shapes are built; dashed grey shapes are future
 | JSON | play-json, Jackson | 2.19.1 (pinned) | Validation with per-field errors |
 | Logging | Logback + logstash-logback-encoder | 8.0 | One JSON object per log line |
 | Metrics | Prometheus Java client | 1.10.0 | Standard `/metrics` endpoint |
+| Tracing | OpenTelemetry SDK, OTLP exporter (Jaeger) | see `build.sbt` | Request, booking-attempt and SQL spans; W3C `traceparent` is continued |
+| End-to-end tests | Selenium WebDriver + ScalaTest (`e2e/`) | see `e2e/build.sbt` | Drives Chrome through the real web app on every pull request |
 | API docs | OpenAPI + Swagger UI | 3.1 + 5.17.14 | Contract served at `/docs` |
 | Tests | ScalaTest (scalatestplus-play 7.0.2) + ScalaCheck | 3.2.19 + 1.18.1 | Readable specs; property-based tests for scheduling invariants |
 | Frontend | React, React Router, TanStack Query | 19, 7, 5 | SPA with cached, auto-refreshing queries |
@@ -474,6 +524,9 @@ needed (NFR-03); Flyway locks migrations so two instances never migrate at once.
 | `SESSION_TTL_HOURS` | 12 | Sign-in lifetime |
 | `DB_POOL_SIZE` | 20 | Connections per API instance |
 | `APPLICATION_SECRET` | development value | Required by Play in production |
+| `HOLD_MINUTES` | 10 | How long a hold keeps its time before it must be confirmed |
+| `HOLD_SWEEP_SECONDS` | 30 | How often each instance releases lapsed holds (0 turns the sweeper off) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty → no export | Where to send traces, e.g. `http://jaeger:4317` |
 
 ### 11.7 Troubleshooting
 
@@ -490,7 +543,10 @@ needed (NFR-03); Flyway locks migrations so two instances never migrate at once.
 ## 12. Out of scope and future work
 
 Rescheduling (today: cancel and rebook), staff booking on behalf of a phone or walk-in customer,
-editing vehicles and technicians, managing packages, prices, breaks and holidays in the UI, a
-temporary hold while the customer confirms (HOLD → CONFIRM), parts ordering, notifications (SMS,
-Zalo, email), jobs needing several technicians, rate limiting on sign-in, OpenTelemetry tracing,
-a CI pipeline, the workshop-controller and parts-staff roles.
+editing vehicles and technicians, breaks and holidays in shifts, notifications (SMS, Zalo,
+email), jobs needing several technicians, rate limiting on sign-in.
+
+Built since version 1.0 of this document (no longer future work): the 10-minute hold before
+confirming, parts stock and orders, the workshop-controller and parts-staff roles, opening hours
+in the UI, the service package catalogue, OpenTelemetry tracing, and a CI/CD pipeline with
+Selenium end-to-end tests.
