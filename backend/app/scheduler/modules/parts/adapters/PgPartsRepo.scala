@@ -19,6 +19,11 @@ final class PgPartsRepo(db: Db) extends PartsRepository:
     SQL"SELECT * FROM parts WHERE dealership_id = $dealershipId::uuid ORDER BY name".as(part.*)
   }
 
+  override def getPart(dealershipId: String, partId: String): Option[Part] = db.run { s =>
+    given java.sql.Connection = Sql.connection(s)
+    SQL"SELECT * FROM parts WHERE id = $partId::uuid AND dealership_id = $dealershipId::uuid".as(part.singleOpt)
+  }
+
   def addPart(dealershipId: String, p: NewPart): String = db.run { s =>
     given java.sql.Connection = Sql.connection(s)
     try

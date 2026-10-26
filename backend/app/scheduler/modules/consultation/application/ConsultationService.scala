@@ -5,7 +5,7 @@ import play.api.libs.json.*
 
 import scheduler.modules.catalog.{CatalogReader, InspectionAreas}
 import scheduler.modules.consultation.*
-import scheduler.modules.identity.{AuthContext, Role, assertSameDealership}
+import scheduler.modules.identity.{AuthContext, assertCanSee, assertSameDealership, requireDealership}
 import scheduler.modules.scheduling.application.ConsultationBookingPort
 import scheduler.modules.scheduling.domain.Compatibility
 import scheduler.modules.vehicles.OwnedVehicles
@@ -69,19 +69,17 @@ final class ConsultationService(db: Db, repo: ConsultationRepository, vehicles: 
     )
     Metrics.consultations.labelValues(input.kind.toString, "submitted").inc()
     log.info("consultation.submitted", "consultationId" -> id, "kind" -> input.kind, "dealershipId" -> input.dealershipId, "areas" -> input.areas)
-    repo.get(id).get
+    reload(id)
 
   def getVisible(auth: AuthContext, id: String): ConsultationView =
     val view = repo.get(id).getOrElse(throw AppError.notFound("Consultation request"))
-    if auth.role == Role.CUSTOMER then
-      if view.customer.id != auth.userId then throw AppError.notFound("Consultation request")
-    else assertSameDealership(auth, view.dealership.id)
+    assertCanSee(auth, view.customer.id, view.dealership.id, "Consultation request")
     view
 
   def listMine(auth: AuthContext): Seq[ConsultationView] = repo.listByCustomer(auth.userId)
 
   def listForDealership(auth: AuthContext, status: Option[ConsultationStatus]): Seq[ConsultationView] =
-    repo.listByDealership(auth.dealershipId.getOrElse(throw AppError.forbidden()), status)
+    repo.listByDealership(auth.requireDealership, status)
 
   def review(auth: AuthContext, id: String, input: Review, log: Log): ConsultationView =
     db.tx { s =>
@@ -90,29 +88,31 @@ final class ConsultationService(db: Db, repo: ConsultationRepository, vehicles: 
       if c.status != ConsultationStatus.SUBMITTED then
         throw AppError.conflict("ALREADY_REVIEWED", s"This request is already ${c.status.toString.toLowerCase}")
 
-      input match
+      val decision = input match
         case Review.Approve(duration, skill, bayType, price, note) =>
           if !catalog.hasSkill(skill) then throw AppError.unprocessable("UNKNOWN_SKILL", s"Unknown skill $skill")
           if !Compatibility.bayFitsVehicle(bayType, c.vehicleType) then
             throw AppError.unprocessable("BAY_TYPE_NOT_FOR_VEHICLE", s"A $bayType bay cannot take a ${c.vehicleType.toString.toLowerCase}")
           repo.approve(s, id, Approval(auth.userId, note, duration, skill, bayType, price))
+          "APPROVE"
         case Review.Reject(note) =>
           repo.reject(s, id, auth.userId, note)
-
-      val decision = input match
-        case _: Review.Approve => "APPROVE"
-        case _: Review.Reject  => "REJECT"
+          "REJECT"
       Metrics.consultations.labelValues(c.kind.toString, if decision == "APPROVE" then "approved" else "rejected").inc()
       log.info("consultation.reviewed", "consultationId" -> id, "decision" -> decision)
     }
-    repo.get(id).get
+    reload(id)
 
   def cancel(auth: AuthContext, id: String, log: Log): ConsultationView =
     if !repo.cancelByCustomer(id, auth.userId) then
       val existing = getVisible(auth, id) // 404 if not theirs
       throw AppError.conflict("CANNOT_CANCEL", s"A ${existing.status.toString.toLowerCase} request cannot be cancelled here")
     log.info("consultation.cancelled", "consultationId" -> id)
-    repo.get(id).get
+    reload(id)
+
+  /** The request as it is after a committed change. */
+  private def reload(id: String): ConsultationView =
+    repo.get(id).getOrElse(throw IllegalStateException(s"Consultation request $id vanished after commit"))
 
   // ---- ConsultationBookingPort: called by scheduling inside its booking transaction ----------
 

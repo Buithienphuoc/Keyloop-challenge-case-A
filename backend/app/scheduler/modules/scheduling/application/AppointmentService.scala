@@ -2,8 +2,8 @@ package scheduler.modules.scheduling.application
 
 import java.time.{Instant, LocalDate}
 
-import scheduler.modules.identity.{AuthContext, Role, assertSameDealership}
-import scheduler.modules.scheduling.domain.{AppointmentStatus, Lifecycle}
+import scheduler.modules.identity.{AuthContext, Role, assertCanSee, requireDealership}
+import scheduler.modules.scheduling.domain.{AppointmentStatus, Lifecycle, LocalDay}
 import scheduler.modules.scheduling.domain.Lifecycle.TransitionError
 import scheduler.shared.{AppError, Db, DbSession, Log, Metrics}
 
@@ -34,7 +34,8 @@ final class AppointmentService(
 
   def get(auth: AuthContext, id: String): AppointmentView = db.run { s =>
     val view = reader.get(s, id).getOrElse(throw AppError.notFound("Appointment"))
-    assertCanSee(s, auth, view)
+    assertCanSee(auth, view.customer.id, view.dealership.id, "Appointment")
+    if !isOwnJobOrNotTechnician(s, auth, view.technician.id) then throw AppError.notFound("Appointment")
     view
   }
 
@@ -42,26 +43,24 @@ final class AppointmentService(
 
   /** A dealership's appointments for one local day (advisor / admin board). */
   def listForDealershipDay(auth: AuthContext, date: LocalDate): Seq[AppointmentView] =
-    val dealershipId = auth.dealershipId.getOrElse(throw AppError.forbidden())
-    val zone = workshop.dealership(dealershipId).timezone
-    db.run(reader.list(_, AppointmentFilter(dealershipId = Some(dealershipId), from = Some(dayStart(date, zone)), to = Some(dayStart(date.plusDays(1), zone)))))
+    val dealershipId = auth.requireDealership
+    val (from, to) = LocalDay.bounds(date, workshop.dealership(dealershipId).timezone)
+    db.run(reader.list(_, AppointmentFilter(dealershipId = Some(dealershipId), from = Some(from), to = Some(to))))
 
   /** The signed-in technician's jobs for one local day. */
   def listTechnicianDay(auth: AuthContext, date: LocalDate): Seq[AppointmentView] = db.run { s =>
     (reader.technicianIdForUser(s, auth.userId), auth.dealershipId) match
       case (Some(technicianId), Some(dealershipId)) =>
-        val zone = workshop.dealership(dealershipId).timezone
-        reader.list(s, AppointmentFilter(technicianId = Some(technicianId), from = Some(dayStart(date, zone)), to = Some(dayStart(date.plusDays(1), zone))))
+        val (from, to) = LocalDay.bounds(date, workshop.dealership(dealershipId).timezone)
+        reader.list(s, AppointmentFilter(technicianId = Some(technicianId), from = Some(from), to = Some(to)))
       case _ => throw AppError.forbidden("Your account is not linked to a technician profile")
   }
 
   def changeStatus(auth: AuthContext, id: String, to: AppointmentStatus, reason: Option[String], log: Log): AppointmentView =
     val from = db.tx { s =>
       val a = writer.lockForUpdate(s, id).getOrElse(throw AppError.notFound("Appointment"))
-      if auth.role == Role.CUSTOMER && a.customerId != auth.userId then throw AppError.notFound("Appointment")
-      if auth.role != Role.CUSTOMER then assertSameDealership(auth, a.dealershipId)
-      if auth.role == Role.TECHNICIAN && !reader.technicianIdForUser(s, auth.userId).contains(a.technicianId) then
-        throw AppError.forbidden("This job is assigned to another technician")
+      assertCanSee(auth, a.customerId, a.dealershipId, "Appointment")
+      if !isOwnJobOrNotTechnician(s, auth, a.technicianId) then throw AppError.forbidden("This job is assigned to another technician")
 
       Lifecycle.checkTransition(a.status, to, auth.role, a.start.toEpochMilli, clock().toEpochMilli).foreach { error =>
         throw TransitionErrors(error)(a.status, to)
@@ -75,7 +74,7 @@ final class AppointmentService(
     if from == AppointmentStatus.HELD then Metrics.holds.labelValues("released").inc()
     Metrics.appointmentStatusChanges.labelValues(to.toString).inc()
     log.info("appointment.status_changed", "appointmentId" -> id, "from" -> from, "to" -> to)
-    db.run(reader.get(_, id)).get
+    reload(id)
 
   /**
    * HELD → CONFIRMED, while the hold is still running. Confirming twice answers with the
@@ -111,14 +110,12 @@ final class AppointmentService(
         Metrics.appointmentStatusChanges.labelValues(AppointmentStatus.CONFIRMED.toString).inc()
         log.info("booking.hold_confirmed", "appointmentId" -> id)
       case HoldOutcome.AlreadyConfirmed => ()
-    db.run(reader.get(_, id)).get
+    reload(id)
 
-  private def assertCanSee(s: DbSession, auth: AuthContext, view: AppointmentView): Unit =
-    if auth.role == Role.CUSTOMER then
-      if view.customer.id != auth.userId then throw AppError.notFound("Appointment")
-    else
-      assertSameDealership(auth, view.dealership.id)
-      if auth.role == Role.TECHNICIAN && !reader.technicianIdForUser(s, auth.userId).contains(view.technician.id) then
-        throw AppError.notFound("Appointment")
+  /** Technicians only ever see and move the jobs assigned to them. */
+  private def isOwnJobOrNotTechnician(s: DbSession, auth: AuthContext, technicianId: String): Boolean =
+    auth.role != Role.TECHNICIAN || reader.technicianIdForUser(s, auth.userId).contains(technicianId)
 
-  private def dayStart(date: LocalDate, zone: java.time.ZoneId): Instant = date.atStartOfDay(zone).toInstant
+  /** The appointment as it is after a committed change. */
+  private def reload(id: String): AppointmentView =
+    db.run(reader.get(_, id)).getOrElse(throw IllegalStateException(s"Appointment $id vanished after commit"))

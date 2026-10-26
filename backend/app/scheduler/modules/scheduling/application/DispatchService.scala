@@ -5,8 +5,8 @@ import java.time.{Instant, LocalDate}
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 
-import scheduler.modules.identity.{AuthContext, assertSameDealership}
-import scheduler.modules.scheduling.domain.{Availability, AppointmentStatus, DayLoad, Workload}
+import scheduler.modules.identity.{AuthContext, assertSameDealership, requireDealership}
+import scheduler.modules.scheduling.domain.{Availability, AppointmentStatus, DayLoad, LocalDay, Workload}
 import scheduler.shared.{AppError, Db, Log, Metrics, Validate}
 import Workshop.rulesOf
 
@@ -38,17 +38,17 @@ final class DispatchService(
 ):
 
   def workload(auth: AuthContext, date: LocalDate): WorkloadView =
-    val dealership = workshop.dealership(dealershipOf(auth))
+    val dealership = workshop.dealership(auth.requireDealership)
     val rules = rulesOf(dealership)
     db.run { s =>
       val WorkshopResources(bays, technicians) = calendar.activeResources(s, dealership.id)
-      val from = date.atStartOfDay(rules.timezone).toInstant
-      val busy = calendar.busyPeriods(s, dealership.id, from, date.plusDays(1).atStartOfDay(rules.timezone).toInstant, clock())
+      val (from, to) = LocalDay.bounds(date, rules.timezone)
+      val busy = calendar.busyPeriods(s, dealership.id, from, to, clock())
       WorkloadView(date, rules.timezone.getId, Workload.forDay(rules, date, bays, technicians, busy))
     }
 
   def reassign(auth: AuthContext, id: String, move: Reassignment, log: Log): AppointmentView =
-    val dealershipId = dealershipOf(auth)
+    val dealershipId = auth.requireDealership
     val zone = workshop.dealership(dealershipId).timezone
     val note = db.tx { s =>
       val locked = writer.lockForUpdate(s, id).getOrElse(throw AppError.notFound("Appointment"))
@@ -74,8 +74,7 @@ final class DispatchService(
         throw AppError.unprocessable("TECHNICIAN_NOT_ON_SHIFT", s"${tech.name} is not working for the whole job")
 
       // A hold that ran out could still sit in the way: release it first.
-      writer.expireHolds(s, clock(), HoldScope.Around(dealershipId, None, job.start, job.end))
-        .flatMap(_.consultationRequestId).foreach(consultations.reopen(s, _))
+      Holds.releaseExpired(s, writer, consultations, clock(), HoldScope.Around(dealershipId, None, job.start, job.end))
       try writer.reassign(s, id, bayId, technicianId)
       catch
         case _: SlotTakenError =>
@@ -92,7 +91,4 @@ final class DispatchService(
     }
     Metrics.reassignments.inc()
     log.info("appointment.reassigned", "appointmentId" -> id, "change" -> note)
-    db.run(reader.get(_, id)).get
-
-  private def dealershipOf(auth: AuthContext): String =
-    auth.dealershipId.getOrElse(throw AppError.forbidden("Your account is not attached to a dealership"))
+    db.run(reader.get(_, id)).getOrElse(throw IllegalStateException(s"Appointment $id vanished after commit"))

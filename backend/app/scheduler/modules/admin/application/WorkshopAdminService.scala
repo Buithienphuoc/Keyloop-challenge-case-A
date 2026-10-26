@@ -6,8 +6,8 @@ import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 
 import scheduler.modules.admin.*
-import scheduler.modules.identity.{AuthContext, PublicUser, Role, StaffMember}
-import scheduler.modules.identity.application.{CreateUser, IdentityRequests, IdentityService}
+import scheduler.modules.identity.{AuthContext, PublicUser, Role, StaffMember, requireDealership}
+import scheduler.modules.identity.application.{CreateUser, IdentityRequests, UserAccounts}
 import scheduler.shared.{AppError, Db, Log, Validate}
 
 object AdminRequests:
@@ -76,25 +76,25 @@ final case class WorkshopView(bays: Seq[BayRecord], technicians: Seq[TechnicianR
 final case class HoursUpdated(hours: WorkshopHours, upcomingOutsideHours: Int)
 
 /** Dealership administration: bays, technicians (skills, shifts) and staff accounts, always for the caller's own dealership. */
-final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity: IdentityService):
+final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity: UserAccounts):
   import AdminRequests.*
 
-  def listBays(auth: AuthContext): Seq[BayRecord] = workshop.listBays(dealershipOf(auth))
+  def listBays(auth: AuthContext): Seq[BayRecord] = workshop.listBays(auth.requireDealership)
 
   def addBay(auth: AuthContext, input: NewBay, log: Log): BayCreated =
-    val id = workshop.addBay(dealershipOf(auth), input.name, input.bayType)
+    val id = workshop.addBay(auth.requireDealership, input.name, input.bayType)
     log.info("admin.bay_created", "bayId" -> id, "bayType" -> input.bayType)
     BayCreated(id, input.name, input.bayType, isActive = true)
 
   /** Deactivating keeps history intact; existing appointments stay valid, no new ones are offered. */
   def setBayActive(auth: AuthContext, bayId: String, isActive: Boolean, log: Log): Unit =
-    if !workshop.setBayActive(dealershipOf(auth), bayId, isActive) then throw AppError.notFound("Bay")
+    if !workshop.setBayActive(auth.requireDealership, bayId, isActive) then throw AppError.notFound("Bay")
     log.info("admin.bay_updated", "bayId" -> bayId, "isActive" -> isActive)
 
-  def listTechnicians(auth: AuthContext): Seq[TechnicianRecord] = workshop.listTechnicians(dealershipOf(auth))
+  def listTechnicians(auth: AuthContext): Seq[TechnicianRecord] = workshop.listTechnicians(auth.requireDealership)
 
   def addTechnician(auth: AuthContext, input: NewTechnician, log: Log): String =
-    val dealershipId = dealershipOf(auth)
+    val dealershipId = auth.requireDealership
     if !input.shiftStart.isBefore(input.shiftEnd) then throw AppError.unprocessable("INVALID_SHIFT", "Shift must end after it starts")
     val id = db.tx { s =>
       val user = input.login.map { l =>
@@ -109,12 +109,12 @@ final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity:
     id
 
   def setTechnicianActive(auth: AuthContext, technicianId: String, isActive: Boolean, log: Log): Unit =
-    if !workshop.setTechnicianActive(dealershipOf(auth), technicianId, isActive) then throw AppError.notFound("Technician")
+    if !workshop.setTechnicianActive(auth.requireDealership, technicianId, isActive) then throw AppError.notFound("Technician")
     log.info("admin.technician_updated", "technicianId" -> technicianId, "isActive" -> isActive)
 
   /** Read-only view of the workshop for the day board (advisors need it too, not just admins). */
   def activeResources(auth: AuthContext): WorkshopView =
-    val dealershipId = dealershipOf(auth)
+    val dealershipId = auth.requireDealership
     WorkshopView(workshop.listBays(dealershipId, onlyActive = true), workshop.listTechnicians(dealershipId, onlyActive = true))
 
   /** Opening hours and booking rules. New bookings follow them at once; existing ones are kept. */
@@ -123,17 +123,14 @@ final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity:
       throw AppError.unprocessable("INVALID_HOURS", "Closing time must be after opening time")
     val hours = WorkshopHours(input.openingTime, input.closingTime, input.openDays.distinct.sorted, input.slotMinutes,
       input.minLeadMinutes, input.maxDaysAhead)
-    val outside = workshop.updateHours(dealershipOf(auth), hours)
+    val outside = workshop.updateHours(auth.requireDealership, hours)
     log.info("admin.hours_updated", "openingTime" -> hours.openingTime.toString, "closingTime" -> hours.closingTime.toString,
       "openDays" -> hours.openDays, "upcomingOutsideHours" -> outside)
     HoursUpdated(hours, outside)
 
-  def listStaff(auth: AuthContext): Seq[StaffMember] = identity.listStaff(dealershipOf(auth))
+  def listStaff(auth: AuthContext): Seq[StaffMember] = identity.listStaff(auth.requireDealership)
 
   def addStaff(auth: AuthContext, input: NewStaff, log: Log): PublicUser =
-    val user = identity.createUser(CreateUser(input.email, input.password, input.fullName, input.phone, input.role, Some(dealershipOf(auth))))
+    val user = identity.createUser(CreateUser(input.email, input.password, input.fullName, input.phone, input.role, Some(auth.requireDealership)))
     log.info("admin.staff_created", "newUserId" -> user.id, "newRole" -> user.role)
     user
-
-  private def dealershipOf(auth: AuthContext): String =
-    auth.dealershipId.getOrElse(throw AppError.forbidden("Your account is not attached to a dealership"))
