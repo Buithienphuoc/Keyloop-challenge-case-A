@@ -27,6 +27,16 @@ final case class NewTechnicianRecord(
     skills: Seq[String]
 )
 
+/** Opening hours and booking rules of one dealership. */
+final case class WorkshopHours(
+    openingTime: LocalTime,
+    closingTime: LocalTime,
+    openDays: Seq[Int],
+    slotMinutes: Int,
+    minLeadMinutes: Int,
+    maxDaysAhead: Int
+)
+
 /**
  * Port: the workshop resources an admin manages. Every method is scoped to one dealership,
  * so an admin can never touch another dealership's bays or technicians.
@@ -44,3 +54,9 @@ trait WorkshopRepository:
   /** Runs in the caller's transaction (it may also create a login). 422 UNKNOWN_SKILL. */
   def addTechnician(s: DbSession, t: NewTechnicianRecord): String
   def setTechnicianActive(dealershipId: String, technicianId: String, isActive: Boolean): Boolean
+
+  /**
+   * Saves new opening hours and booking rules. Returns how many upcoming bookings now fall
+   * outside them: they stay valid, but the dealership should call those customers.
+   */
+  def updateHours(dealershipId: String, hours: WorkshopHours): Int

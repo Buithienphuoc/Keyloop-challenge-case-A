@@ -14,7 +14,9 @@ final case class Config(
     sessionTtlHours: Double,
     seedDemoData: Boolean,
     corsOrigins: Seq[String],
-    dbPoolSize: Int
+    dbPoolSize: Int,
+    holdMinutes: Int,
+    holdSweepSeconds: Int
 )
 
 object Config:
@@ -28,5 +30,7 @@ object Config:
       sessionTtlHours = c.get[Double]("scheduler.session-ttl-hours"),
       seedDemoData = c.get[Boolean]("scheduler.seed-demo-data"),
       corsOrigins = c.get[String]("scheduler.cors-origins").split(",").map(_.trim).filter(_.nonEmpty).toSeq,
-      dbPoolSize = c.get[Int]("scheduler.db-pool-size")
+      dbPoolSize = c.get[Int]("scheduler.db-pool-size"),
+      holdMinutes = c.get[Int]("scheduler.hold-minutes"),
+      holdSweepSeconds = c.get[Int]("scheduler.hold-sweep-seconds")
     )

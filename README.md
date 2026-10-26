@@ -37,7 +37,9 @@ All demo accounts use the password **`Demo@2026`** (the login page has one-tap b
 | `advisor.d1@demo.vn` | Service advisor, District 1 | Workshop day board; review the waiting inspection request |
 | `tech.hung@demo.vn` | Technician, District 1 | Start and finish assigned jobs |
 | `admin.d1@demo.vn` | Dealership admin, District 1 | Bays, technicians (skills and shifts), staff accounts |
-| `sysadmin@demo.vn` | System manager | Onboard a new dealership with its first admin |
+| `sysadmin@demo.vn` | System manager | Onboard a new dealership with its first admin; edit the service package catalogue |
+| `controller.d1@demo.vn` | Workshop controller, District 1 | Workload per bay and technician; move a job to another bay or technician |
+| `parts.d1@demo.vn` | Parts staff, District 1 | Stock list; move parts orders from requested to issued |
 
 The seed fills part of the next working day at District 1 (09:00 has one stand left, 10:00 is
 full) so availability looks real. To start again from an empty database, stop the API and delete
@@ -56,6 +58,8 @@ Using your own PostgreSQL instead: `docker compose up -d`, then
 | `SLOW_QUERY_MS` | 200 | Log queries slower than this |
 | `SESSION_TTL_HOURS` | 12 | Sign-in lifetime |
 | `APPLICATION_SECRET` | dev value | Required by Play in production |
+| `HOLD_MINUTES` / `HOLD_SWEEP_SECONDS` | 10 / 30 | How long a held slot is kept; how often expired holds are released |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty → no export | Send traces over OTLP, e.g. `http://jaeger:4318` |
 
 ## Tests
 
@@ -102,6 +106,61 @@ the pool. To scale out, run more instances behind a load balancer: the API keeps
 memory (sessions are in the database), and the no-double-booking rule is enforced by PostgreSQL,
 so it holds across any number of instances.
 
+### End-to-end tests in a real browser (Selenium, Scala)
+
+`e2e/` is a separate sbt project: ScalaTest drives Chrome through the running web app, the way a
+person would (by visible text, labels and roles; it waits for the page and never sleeps).
+
+```bash
+docker compose --profile full up -d --build   # the system under test: 3 API instances behind nginx
+cd e2e && sbt test                            # BASE_URL=http://localhost:8080 by default; HEADLESS=false to watch
+```
+
+| Suite (`e2e/src/test/scala/scheduler/e2e/…`) | What it does |
+| --- | --- |
+| `BookingJourneySpec` | One booking across every role: a new customer registers, adds a motorbike, picks a package, **holds** a time, gives it back, holds it again and confirms; sends an advice request. The advisor finds the job on the day board and the request in the queue; the workshop controller checks the workload and **moves** the job to another bay and technician; that technician sees it (with the customer's note) and **requests a part**; the parts desk restocks and **issues** it; the customer **cancels**. Leaves the demo data as it found it |
+| `AuthSpec` | Wrong password, demo-account buttons, sign-out, a customer kept out of staff pages, each role's start page |
+| `BackOfficeSpec` | Dealership admin: bays, technicians, saving opening hours. System manager: dealerships and the package catalogue |
+
+26 tests, about a minute. CI runs them on every pull request against the freshly built images;
+a failure uploads a screenshot of each failing step and the API logs. Writing them found a real
+bug: behind nginx, Play's CORS filter refused the browser's sign-in (403), now fixed by setting
+`CORS_ORIGIN` to the web app's address in docker-compose and on Azure.
+
+## Scale out and deploy
+
+The API keeps nothing that matters in memory: sessions, holds and the no-double-booking rule all
+live in PostgreSQL, so more instances need no code change.
+
+```bash
+docker compose --profile full up -d --build      # 3 API instances + nginx + PostgreSQL + Jaeger + Prometheus
+node scripts/load-test.mjs http://localhost:8080 # reads spread over instances; a same-slot booking race
+```
+
+Web app <http://localhost:8080>, Jaeger <http://localhost:16686>, Prometheus <http://localhost:9090>.
+A run on one 2-vCPU machine:
+
+```
+1) 1000 availability reads, 50 at a time
+  status   200: 1000
+  served by 09d8dee07fc3: 332, 3e09cbee84f7: 335, 3eaa4fc9a1fb: 333
+2) 15 vehicles book 2026-10-26T08:00 at the same instant (capacity 3)
+  status   201: 3, 409: 12
+  served by 09d8dee07fc3: 5, 3e09cbee84f7: 5, 3eaa4fc9a1fb: 5
+  ✔ exactly 3 bookings succeeded for 3 free bay+technician pairs; the rest got 409
+```
+
+**CI/CD** (`.github/workflows/ci-cd.yml`): every pull request runs the backend tests, the web
+app's lint and build, and builds both Docker images. A push to `master` also pushes the images to
+Azure Container Registry, rolls them out to **Azure Container Apps** (API: internal, 1-5 replicas
+scaled on concurrent requests; web: public HTTPS) and smoke-tests the live site. GitHub signs in
+to Azure with OpenID Connect, so no password is stored. One-off Azure set-up, in Cloud Shell:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Buithienphuoc/Keyloop-challenge-case-A/master/deploy/azure/setup.sh -o setup.sh
+bash setup.sh   # then add the 5 printed values as GitHub repository variables
+```
+
 ## What it does
 
 **Customers** (the main audience, so their flow comes first)
@@ -112,6 +171,8 @@ so it holds across any number of instances.
   then picks a time. Both use one "consult first, then book" flow.
 - Availability refreshes every 30 s and opens on the first day that still has room.
 - If someone takes the slot during checkout, the page offers the three nearest free times.
+- The chosen time is **held for 10 minutes** while the customer reviews the booking (a countdown
+  shows it); confirming turns the hold into a booking, going back releases it.
 - Cancel before the start; add to calendar (.ics); manage vehicles.
 
 **Staff**
@@ -119,8 +180,13 @@ so it holds across any number of instances.
   advice-request queue.
 - *Technician*: today's jobs with large start and finish buttons.
 - *Dealership admin*: bays (in or out of service), technicians with skills, shifts and working
-  days, staff accounts.
-- *System manager*: all dealerships with capacity figures; onboard a dealership and its admin.
+  days, staff accounts, opening hours (with a count of bookings that fall outside new hours).
+- *Workshop controller*: the day's load per bay and technician; move a job to another bay or
+  technician (the same database constraints refuse a clash).
+- *Parts staff*: stock list and parts orders (requested → ordered → received → issued), which an
+  advisor or technician can raise from a job; issuing takes stock and can never go below zero.
+- *System manager*: all dealerships with capacity figures; onboard a dealership and its admin;
+  the service package catalogue.
 
 ## Diagrams
 
@@ -236,7 +302,10 @@ history of the earlier build).
 - **Health**: `GET /health` checks the database. **Audit trail**: every status change is stored in
   `appointment_events` (who, when, from, to).
 
-Tracing (OpenTelemetry) is the next step; request IDs already give per-request correlation.
+- **Tracing** (OpenTelemetry): one span per request (continuing a W3C `traceparent`), one per
+  booking attempt and one per SQL statement. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to export them;
+  the `full` docker-compose profile sends them to Jaeger. Responses carry `X-Trace-Id` and
+  `X-Served-By` (which instance answered).
 
 ## Assumptions
 
@@ -247,15 +316,13 @@ Tracing (OpenTelemetry) is the next step; request IDs already give per-request c
   advisor sets them when approving.
 - Bay types limit vehicle types: motorbike stand, car lift, diagnostic bay (both).
 - Customers book for themselves; staff manage bookings but do not create them in this version.
-- "Sales" from the brainstorm is covered by the service advisor role; workshop controller and
-  parts staff are future roles.
+- "Sales" from the brainstorm is covered by the service advisor role.
 - Prices are shown in VND; all times are shown in the dealership's time zone.
 
 ## Not built yet
 
-Rescheduling (cancel and rebook today), staff booking on behalf of a customer, parts ordering,
-notifications (SMS/Zalo/email), breaks and holidays in shifts, multi-technician jobs, rate
-limiting on login, OpenTelemetry tracing, CI pipeline.
+Rescheduling (cancel and rebook today), staff booking on behalf of a customer, notifications
+(SMS/Zalo/email), breaks and holidays in shifts, multi-technician jobs, rate limiting on login.
 
 ## AI collaboration narrative
 

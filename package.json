@@ -8,7 +8,8 @@
     "dev": "node scripts/dev.mjs",
     "test": "cd backend && sbt test",
     "test:load": "cd backend && sbt loadTest",
-    "typecheck": "npm --prefix frontend run typecheck"
+    "typecheck": "npm --prefix frontend run typecheck",
+    "test:e2e": "cd e2e && sbt test"
   },
   "engines": {
     "node": ">=22"

@@ -24,6 +24,8 @@ const remembered = () => {
 
 /**
  * The main customer journey: vehicle → service → place & time → confirm.
+ * Moving to the confirm step places a short hold on the chosen time (HELD), so nobody can
+ * take it while the customer reviews; "Confirm booking" turns the hold into a booking.
  * With ?request=<id> it books an advisor-approved consultation instead, and only the
  * time and confirmation steps are shown (vehicle, service and dealership are already fixed).
  */
@@ -51,6 +53,8 @@ export function BookPage() {
   const [addingVehicle, setAddingVehicle] = useState(false);
   const [alternatives, setAlternatives] = useState<Slot[] | null>(null);
   const [booked, setBooked] = useState<Appointment | null>(null);
+  const [held, setHeld] = useState<Appointment | null>(null);
+  const [holdLapsed, setHoldLapsed] = useState(false);
 
   // In consultation mode everything except the time is decided by the approved request.
   useEffect(() => {
@@ -106,27 +110,67 @@ export function BookPage() {
     }
   }, [availability.data, autoPick]);
 
-  // A new idempotency key per distinct booking attempt: a double tap or a retry after a
-  // network blip can never create two appointments.
+  // A new idempotency key per distinct hold attempt: a double tap or a retry after a
+  // network blip can never hold (or book) twice.
   const idemKey = useRef<string>(crypto.randomUUID());
   useEffect(() => {
     idemKey.current = crypto.randomUUID();
   }, [slot?.start, vehicleId, packageId, dealershipId, requestId]);
 
-  const book = useMutation({
-    mutationFn: () =>
+  const hold = useMutation({
+    mutationFn: (s: Slot) =>
       post<Appointment>(
-        '/api/appointments',
+        '/api/appointments/holds',
         {
           dealershipId,
           vehicleId,
-          start: slot!.start,
+          start: s.start,
           ...(consult ? { consultationRequestId: consult.id } : { packageId }),
           customerNote: note || undefined,
         },
         { 'Idempotency-Key': idemKey.current },
       ),
     onSuccess: (a) => {
+      setHeld(a);
+      setHoldLapsed(false);
+      qc.invalidateQueries({ queryKey: ['availability'] });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.code === 'SLOT_UNAVAILABLE') {
+        setAlternatives(((err.details as { alternatives?: Slot[] })?.alternatives ?? []) as Slot[]);
+        qc.invalidateQueries({ queryKey: ['availability'] });
+      }
+    },
+  });
+
+  /** Gives the held time back (the customer went back to change something). */
+  const release = () => {
+    if (held) {
+      post(`/api/appointments/${held.id}/cancel`, { reason: 'Customer changed the time' }).catch(() => undefined);
+      setHeld(null);
+      qc.invalidateQueries({ queryKey: ['availability'] });
+    }
+    hold.reset();
+  };
+
+  const placeHold = (s: Slot) => {
+    release();
+    idemKey.current = crypto.randomUUID();
+    setAlternatives(null);
+    setHoldLapsed(false);
+    setStep('confirm');
+    hold.mutate(s);
+  };
+
+  const go = (next: Step) => {
+    if (step === 'confirm' && next !== 'confirm') release();
+    setStep(next);
+  };
+
+  const book = useMutation({
+    mutationFn: () => post<Appointment>(`/api/appointments/${held!.id}/confirm`),
+    onSuccess: (a) => {
+      setHeld(null);
       setBooked(a);
       qc.invalidateQueries({ queryKey: keys.myAppointments });
       qc.invalidateQueries({ queryKey: keys.myRequests });
@@ -139,8 +183,9 @@ export function BookPage() {
       window.scrollTo({ top: 0 });
     },
     onError: (err) => {
-      if (err instanceof ApiError && err.code === 'SLOT_UNAVAILABLE') {
-        setAlternatives(((err.details as { alternatives?: Slot[] })?.alternatives ?? []) as Slot[]);
+      if (err instanceof ApiError && err.code === 'HOLD_EXPIRED') {
+        setHeld(null);
+        setHoldLapsed(true);
         qc.invalidateQueries({ queryKey: ['availability'] });
       }
     },
@@ -150,6 +195,11 @@ export function BookPage() {
     setSlot(s);
     setAlternatives(null);
     book.reset();
+  };
+
+  const pickAlternative = (s: Slot) => {
+    setSlot(s);
+    placeHold(s);
   };
 
   if (vehicles.isLoading || packages.isLoading || dealerships.isLoading || request.isLoading) return <Loading what="Getting things ready" />;
@@ -235,7 +285,7 @@ export function BookPage() {
       <ol className="steps">
         {steps.map((s, i) => (
           <li key={s.id} className={i < currentIndex ? 'done' : i === currentIndex ? 'current' : ''}>
-            <button type="button" disabled={!canOpen(s.id)} onClick={() => canOpen(s.id) && setStep(s.id)} aria-current={i === currentIndex ? 'step' : undefined}>
+            <button type="button" disabled={!canOpen(s.id)} onClick={() => canOpen(s.id) && (s.id === 'confirm' && slot ? step !== 'confirm' && placeHold(slot) : go(s.id))} aria-current={i === currentIndex ? 'step' : undefined}>
               <span className="n">{i + 1}</span>
               {s.label}
             </button>
@@ -346,7 +396,7 @@ export function BookPage() {
                 it needs and how long it takes.
               </div>
               <div className="nav-buttons">
-                <button className="btn" onClick={() => setStep('vehicle')}>
+                <button className="btn" onClick={() => go('vehicle')}>
                   Back
                 </button>
                 <button className="btn btn-primary" disabled={!pkg} onClick={() => setStep('time')}>
@@ -428,18 +478,31 @@ export function BookPage() {
                   )}
                 </>
               )}
+              {slot && (
+                <div className="field">
+                <label htmlFor="note">Anything the technician should know? (optional)</label>
+                <textarea
+                  id="note"
+                  className="input"
+                  maxLength={1000}
+                  placeholder="For example: the front brake squeaks when it rains."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+                </div>
+              )}
               <div className="nav-buttons">
                 {consult ? (
                   <Link className="btn" to="/requests">
                     Back
                   </Link>
                 ) : (
-                  <button className="btn" onClick={() => setStep('service')}>
+                  <button className="btn" onClick={() => go('service')}>
                     Back
                   </button>
                 )}
-                <button className="btn btn-primary" disabled={!slot} onClick={() => setStep('confirm')}>
-                  Review booking
+                <button className="btn btn-primary" disabled={!slot} onClick={() => slot && placeHold(slot)}>
+                  Hold this time and review
                 </button>
               </div>
             </div>
@@ -450,9 +513,20 @@ export function BookPage() {
             <div className="stack">
               <h2>Check and confirm</h2>
               <p className="muted">
-                We will hold a {consult?.bayType === 'DIAGNOSTIC_BAY' ? 'diagnostic bay' : 'bay'} and a technician for you from {time(slot.start)} to{' '}
+                A {consult?.bayType === 'DIAGNOSTIC_BAY' ? 'diagnostic bay' : 'bay'} and a technician are kept for you from {time(slot.start)} to{' '}
                 {time(slot.end)}. You can cancel any time before then.
               </p>
+
+              {hold.isPending && <Loading what={`Holding ${time(slot.start)} for you`} />}
+              {held?.holdExpiresAt && <HoldTimer until={held.holdExpiresAt} onLapse={() => (setHeld(null), setHoldLapsed(true))} />}
+              {holdLapsed && (
+                <div className="notice notice-error" role="alert">
+                  We could only keep {time(slot.start)} for you for a few minutes, and that time has run out.{' '}
+                  <button className="btn btn-sm" onClick={() => placeHold(slot)}>
+                    Try to hold it again
+                  </button>
+                </div>
+              )}
 
               {alternatives !== null ? (
                 <div className="stack">
@@ -463,7 +537,7 @@ export function BookPage() {
                   {alternatives.length > 0 && (
                     <div className="slots">
                       {alternatives.map((s) => (
-                        <button key={s.start} type="button" className="slot" onClick={() => pickSlot(s)}>
+                        <button key={s.start} type="button" className="slot" onClick={() => pickAlternative(s)}>
                           {time(s.start)}
                           <small>{dayShort(s.start)}</small>
                         </button>
@@ -472,26 +546,15 @@ export function BookPage() {
                   )}
                 </div>
               ) : (
-                <ErrorNote error={book.error} />
+                <ErrorNote error={holdLapsed ? null : book.error ?? hold.error} />
               )}
 
-              <div className="field">
-                <label htmlFor="note">Anything the technician should know? (optional)</label>
-                <textarea
-                  id="note"
-                  className="input"
-                  maxLength={1000}
-                  placeholder="For example: the front brake squeaks when it rains."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
 
               <div className="nav-buttons">
-                <button className="btn" onClick={() => setStep('time')}>
+                <button className="btn" onClick={() => go('time')}>
                   Change time
                 </button>
-                <button className="btn btn-primary" disabled={book.isPending || alternatives !== null} onClick={() => book.mutate()}>
+                <button className="btn btn-primary" disabled={!held || book.isPending || alternatives !== null} onClick={() => book.mutate()}>
                   {book.isPending ? 'Booking…' : 'Confirm booking'}
                 </button>
               </div>
@@ -502,6 +565,30 @@ export function BookPage() {
         <Ticket data={ticket} />
       </div>
 
+    </div>
+  );
+}
+
+/** Minutes and seconds left on a hold; tells the page when it runs out. */
+function HoldTimer({ until, onLapse }: { until: string; onLapse: () => void }) {
+  const [now, setNow] = useState(() => Date.now());
+  const end = Date.parse(until);
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const left = Math.max(0, Math.round((end - now) / 1000));
+  useEffect(() => {
+    if (left === 0) onLapse();
+  }, [left, onLapse]);
+  const mm = Math.floor(left / 60);
+  const ss = String(left % 60).padStart(2, '0');
+  return (
+    <div className={`hold-timer${left < 60 ? ' urgent' : ''}`} role="timer" aria-live="off">
+      <span>This time is reserved for you while you check the details. Nobody else can book it.</span>
+      <span className="sign" aria-label={`${mm} minutes ${ss} seconds left`}>
+        {mm}:{ss}
+      </span>
     </div>
   );
 }

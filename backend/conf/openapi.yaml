@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Unified Service Scheduler API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Book vehicle service appointments with real-time availability of **both** a service bay
     and a qualified technician for the whole job.
@@ -14,8 +14,11 @@ info:
     every log line for that request carries the same ID.
 
     **Times** are ISO-8601 with offset and are interpreted in the dealership's time zone.
+
+    **Tracing**: every response carries `X-Trace-Id` (OpenTelemetry). Send a W3C `traceparent`
+    header to continue your own trace. `X-Served-By` names the API instance that answered.
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:8081
 tags:
   - name: Auth
   - name: Catalogue
@@ -25,6 +28,8 @@ tags:
   - name: Staff
   - name: Admin
   - name: System
+  - name: Workshop control
+  - name: Parts
   - name: Operations
 
 components:
@@ -64,7 +69,7 @@ components:
             requestId: { type: string }
     Role:
       type: string
-      enum: [CUSTOMER, SERVICE_ADVISOR, TECHNICIAN, ADMIN, SYSTEM_MANAGER]
+      enum: [CUSTOMER, SERVICE_ADVISOR, TECHNICIAN, ADMIN, SYSTEM_MANAGER, WORKSHOP_CONTROLLER, PARTS_STAFF]
     User:
       type: object
       properties:
@@ -163,7 +168,8 @@ components:
         customerNote: { type: string, maxLength: 1000 }
     AppointmentStatus:
       type: string
-      enum: [CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW]
+      enum: [HELD, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW, EXPIRED]
+      description: HELD is a short reservation waiting for the customer to confirm; EXPIRED is a hold that ran out.
     Appointment:
       type: object
       properties:
@@ -189,6 +195,7 @@ components:
         customerNote: { type: [string, 'null'] }
         cancelReason: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
+        holdExpiresAt: { type: [string, 'null'], format: date-time, description: Only while HELD }
     Consultation:
       type: object
       properties:
@@ -207,6 +214,75 @@ components:
         bayType: { type: [string, 'null'] }
         estimatedPrice: { type: [integer, 'null'] }
         appointment: { type: [object, 'null'] }
+    ResourceLoad:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        availableMinutes: { type: integer, description: Shift (technician) or opening hours (bay) that day }
+        bookedMinutes: { type: integer }
+        jobs: { type: integer }
+        utilisation: { type: integer, description: Percent booked }
+    Workload:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        timezone: { type: string }
+        technicians: { type: array, items: { $ref: '#/components/schemas/ResourceLoad' } }
+        bays: { type: array, items: { $ref: '#/components/schemas/ResourceLoad' } }
+    PackageRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        vehicleType: { type: string, enum: [MOTORBIKE, CAR] }
+        durationMinutes: { type: integer }
+        requiredSkill: { type: string }
+        bayType: { type: string }
+        priceAmount: { type: integer }
+        currency: { type: string }
+        checklist: { type: array, items: { type: string } }
+        isRecommended: { type: boolean }
+        isActive: { type: boolean }
+    Part:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        unitPrice: { type: integer }
+        currency: { type: string }
+        stockQty: { type: integer }
+        isActive: { type: boolean }
+    PartOrderStatus:
+      type: string
+      enum: [REQUESTED, ORDERED, RECEIVED, ISSUED, CANCELLED]
+    PartOrder:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string, example: PO-4KX2QA }
+        status: { $ref: '#/components/schemas/PartOrderStatus' }
+        appointment: { type: [object, 'null'], properties: { id: { type: string }, reference: { type: string }, start: { type: string }, vehiclePlate: { type: string } } }
+        note: { type: [string, 'null'] }
+        requestedBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              partId: { type: string }
+              sku: { type: string }
+              name: { type: string }
+              quantity: { type: integer }
+              unitPrice: { type: integer }
+              inStock: { type: integer }
+        total: { type: integer }
+        currency: { type: string }
 
 security:
   - bearer: []
@@ -332,6 +408,48 @@ paths:
           description: SLOT_UNAVAILABLE (details.alternatives holds the nearest free slots), VEHICLE_ALREADY_BOOKED or CONSULTATION_NOT_BOOKABLE
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
         '422': { description: 'Start time breaks a workshop rule (TOO_SOON, OUTSIDE_OPENING_HOURS, …), the package does not fit the vehicle, or NOT_OFFERED_HERE (no bay or technician for this job at the dealership)' }
+  /api/appointments/holds:
+    post:
+      tags: [Booking]
+      summary: Hold a slot while the customer confirms (HELD, 10 minutes by default)
+      description: |
+        Same body, rules and Idempotency-Key as booking. The bay, technician and vehicle are taken
+        exactly as for a booking, so nobody else can book the time; the hold runs out at `holdExpiresAt`
+        unless confirmed. A hold that ran out is released before anyone else's booking is allocated.
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, minLength: 8, maxLength: 100 } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookRequest' } } } }
+      responses:
+        '201': { description: Held, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '409': { description: As for booking, e.g. SLOT_UNAVAILABLE with alternatives }
+  /api/appointments/{id}/confirm:
+    post:
+      tags: [Booking]
+      summary: Confirm a hold (HELD → CONFIRMED). Confirming twice returns the same booking.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Confirmed, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '409': { description: HOLD_EXPIRED (the slot was released) or NOT_HELD }
+  /api/appointments/{id}/reassign:
+    post:
+      tags: [Workshop control]
+      summary: Move a confirmed job to another bay and/or technician (workshop controller, admin)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Give a bayId, a technicianId or both.
+              properties:
+                bayId: { type: string, format: uuid }
+                technicianId: { type: string, format: uuid }
+                reason: { type: string, maxLength: 300 }
+      responses:
+        '200': { description: Moved, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '409': { description: RESOURCE_BUSY (the bay or technician has a job then) or NOT_REASSIGNABLE }
+        '422': { description: BAY_TYPE_MISMATCH, TECHNICIAN_NOT_QUALIFIED, TECHNICIAN_NOT_ON_SHIFT, UNKNOWN_BAY, UNKNOWN_TECHNICIAN, NOTHING_TO_CHANGE }
   /api/me/appointments:
     get:
       tags: [Booking]
@@ -461,6 +579,13 @@ paths:
       summary: Active bays and technicians of my dealership (for the day board)
       responses:
         '200': { description: OK }
+  /api/staff/workload:
+    get:
+      tags: [Workshop control]
+      summary: How booked each technician and bay is on a day
+      parameters: [{ $ref: '#/components/parameters/Date' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Workload' } } } }
   /api/technician/jobs:
     get:
       tags: [Staff]
@@ -514,8 +639,30 @@ paths:
     get: { tags: [Admin], summary: Staff accounts of my dealership, responses: { '200': { description: OK } } }
     post:
       tags: [Admin]
-      summary: Create a service advisor or admin account
+      summary: Create a staff account (service advisor, workshop controller, parts staff or admin)
       responses: { '201': { description: Created } }
+
+  /api/admin/opening-hours:
+    put:
+      tags: [Admin]
+      summary: Set opening hours and booking rules of my dealership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [openingTime, closingTime, openDays, slotMinutes, minLeadMinutes, maxDaysAhead]
+              properties:
+                openingTime: { type: string, example: '08:00' }
+                closingTime: { type: string, example: '17:30' }
+                openDays: { type: array, items: { type: integer, minimum: 1, maximum: 7 } }
+                slotMinutes: { type: integer, enum: [15, 30, 60] }
+                minLeadMinutes: { type: integer }
+                maxDaysAhead: { type: integer }
+      responses:
+        '200': { description: 'Saved. upcomingOutsideHours counts upcoming bookings that now fall outside the hours (they are kept).' }
+        '422': { description: INVALID_HOURS }
 
   /api/system/dealerships:
     get: { tags: [System], summary: All dealerships with capacity figures, responses: { '200': { description: OK } } }
@@ -523,6 +670,128 @@ paths:
       tags: [System]
       summary: Onboard a dealership together with its first admin
       responses: { '201': { description: Created } }
+  /api/system/packages:
+    get:
+      tags: [System]
+      summary: The service package catalogue, retired packages included
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PackageRecord' } } } } }
+    post:
+      tags: [System]
+      summary: Add a service package (bookable at once wherever a bay and a qualified technician exist)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name, description, vehicleType, durationMinutes, requiredSkill, bayType, priceAmount, checklist]
+              properties:
+                code: { type: string }
+                name: { type: string }
+                description: { type: string }
+                vehicleType: { type: string, enum: [MOTORBIKE, CAR] }
+                durationMinutes: { type: integer, description: Multiple of 15 }
+                requiredSkill: { type: string }
+                bayType: { type: string }
+                priceAmount: { type: integer }
+                checklist: { type: array, items: { type: string } }
+                isRecommended: { type: boolean }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/PackageRecord' } } } }
+        '409': { description: PACKAGE_CODE_TAKEN }
+        '422': { description: BAY_NOT_FOR_VEHICLE, UNKNOWN_SKILL or UNKNOWN_BAY_TYPE }
+  /api/system/packages/{id}:
+    patch:
+      tags: [System]
+      summary: Change or retire a package (fields left out keep their value)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                durationMinutes: { type: integer }
+                priceAmount: { type: integer }
+                checklist: { type: array, items: { type: string } }
+                isRecommended: { type: boolean }
+                isActive: { type: boolean }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PackageRecord' } } } }
+
+  /api/parts:
+    get:
+      tags: [Parts]
+      summary: Parts list and stock of my dealership
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Part' } } } } }
+    post:
+      tags: [Parts]
+      summary: Add a part (parts staff, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, name, unitPrice]
+              properties:
+                sku: { type: string }
+                name: { type: string }
+                unitPrice: { type: integer }
+                stockQty: { type: integer }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Part' } } } }
+        '409': { description: SKU_TAKEN }
+  /api/parts/{id}/stock:
+    post:
+      tags: [Parts]
+      summary: Correct the stock count (stock take); never below zero
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [delta], properties: { delta: { type: integer } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Part' } } } }
+        '409': { description: OUT_OF_STOCK }
+  /api/part-orders:
+    get:
+      tags: [Parts]
+      summary: Parts orders of my dealership (newest first)
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/PartOrderStatus' } }
+        - { name: appointmentId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PartOrder' } } } } }
+    post:
+      tags: [Parts]
+      summary: Request parts, optionally for a booked job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                appointmentId: { type: string, format: uuid }
+                note: { type: string }
+                lines: { type: array, items: { type: object, required: [partId, quantity], properties: { partId: { type: string, format: uuid }, quantity: { type: integer, minimum: 1, maximum: 100 } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/PartOrder' } } } }
+        '422': { description: UNKNOWN_PART or UNKNOWN_APPOINTMENT }
+  /api/part-orders/{id}/status:
+    post:
+      tags: [Parts]
+      summary: Move an order on (REQUESTED → ORDERED → RECEIVED → ISSUED, or straight to ISSUED from stock)
+      description: RECEIVED puts the quantities on the shelf; ISSUED takes them off and fails with OUT_OF_STOCK rather than go below zero.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/PartOrderStatus' } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PartOrder' } } } }
+        '409': { description: OUT_OF_STOCK or INVALID_STATUS_TRANSITION }
 
   /health:
     get:

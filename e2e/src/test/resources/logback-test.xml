@@ -1,0 +1,9 @@
+<configuration>
+  <appender name="OUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder><pattern>%d{HH:mm:ss.SSS} %-5level %logger{20} - %msg%n</pattern></encoder>
+  </appender>
+  <!-- Selenium and its HTTP client are chatty; keep their warnings only. -->
+  <logger name="org.openqa" level="WARN" />
+  <logger name="io.netty" level="WARN" />
+  <root level="INFO"><appender-ref ref="OUT" /></root>
+</configuration>

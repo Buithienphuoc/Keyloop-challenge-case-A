@@ -89,12 +89,12 @@ final class PgDb private (val dataSource: HikariDataSource, log: Log, slowQueryM
           proxy(classOf[PreparedStatement]) { (m, a) =>
             if m.getName.startsWith("execute") then
               val started = System.nanoTime()
-              try m.invoke(ps, a*)
+              try Tracing.span(s"db ${PgDb.verb(sql)}", "db.system" -> "postgresql", "db.query.text" -> PgDb.shape(sql))(m.invoke(ps, a*))
               finally
                 val ms = (System.nanoTime() - started) / 1e6
                 Metrics.dbQueryDuration.observe(ms / 1000)
                 if ms >= slowQueryMs then
-                  log.warn("db.slow_query", "durationMs" -> math.round(ms), "sql" -> sql.replaceAll("\\s+", " ").take(300))
+                  log.warn("db.slow_query", "durationMs" -> math.round(ms), "sql" -> PgDb.shape(sql))
             else m.invoke(ps, a*)
           }
         case other => other
@@ -107,6 +107,10 @@ final class PgDb private (val dataSource: HikariDataSource, log: Log, slowQueryM
     iface.cast(Proxy.newProxyInstance(iface.getClassLoader, Array(iface), handler))
 
 object PgDb:
+  /** The statement's shape for logs and traces: parameters are placeholders, never values. */
+  def shape(sql: String): String = sql.replaceAll("\\s+", " ").trim.take(300)
+  def verb(sql: String): String = sql.trim.takeWhile(!_.isWhitespace).toUpperCase
+
   def apply(url: String, log: Log, slowQueryMs: Long, poolSize: Int): PgDb =
     val cfg = HikariConfig()
     val (jdbcUrl, user, password) = toJdbc(url)

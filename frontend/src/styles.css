@@ -456,8 +456,20 @@ textarea.input {
   background: var(--go-tint);
   color: var(--go);
 }
+.pill-HELD,
+.pill-ORDERED,
+.pill-REQUESTED {
+  background: var(--hivis-tint);
+  color: var(--amber);
+}
+.pill-RECEIVED,
+.pill-ISSUED {
+  background: var(--go-tint);
+  color: var(--go);
+}
 .pill-CANCELLED,
 .pill-NO_SHOW,
+.pill-EXPIRED,
 .pill-REJECTED {
   background: #eceff0;
   color: var(--ink-3);
@@ -1262,6 +1274,12 @@ table.table {
   border-color: #a9d3b8;
   color: #1d5535;
 }
+.job.s-HELD {
+  background: repeating-linear-gradient(-45deg, var(--hivis-tint), var(--hivis-tint) 6px, #fff 6px, #fff 12px);
+  border-style: dashed;
+  border-color: var(--hivis);
+  color: #5c3b00;
+}
 .job.selected {
   box-shadow: 0 0 0 2px var(--ink);
 }
@@ -1483,4 +1501,94 @@ fieldset.fieldset {
 }
 .board-hours .ticks span:first-child {
   transform: translateX(4px);
+}
+
+/* ---------------------------------------------------------------------------
+   Hold countdown, workload bars, parts
+--------------------------------------------------------------------------- */
+.hold-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--hivis-tint);
+  border: 1.5px solid var(--hivis);
+  color: #5c3b00;
+}
+.hold-timer .sign {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.hold-timer.urgent {
+  background: var(--stop-tint);
+  border-color: var(--stop);
+  color: var(--stop);
+}
+
+.load-list {
+  display: grid;
+  gap: 10px;
+}
+.load-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) 1fr 64px;
+  align-items: center;
+  gap: 12px;
+}
+.load-row .who-cell span {
+  display: block;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+.load-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: #e8ecea;
+  overflow: hidden;
+}
+.load-bar > div {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--lane);
+}
+.load-bar.high > div {
+  background: var(--amber);
+}
+.load-bar.full > div {
+  background: var(--stop);
+}
+.load-row .pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .load-row {
+    grid-template-columns: 1fr 52px;
+  }
+  .load-row .load-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+.order-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.order-lines td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-lines td:last-child {
+  text-align: right;
+}
+.low-stock {
+  color: var(--stop);
+  font-weight: 600;
 }

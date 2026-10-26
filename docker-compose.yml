@@ -1,6 +1,15 @@
-# Optional: run against a regular PostgreSQL instead of the embedded one.
-#   docker compose up -d
-#   DATABASE_URL=postgres://scheduler:scheduler@localhost:5432/scheduler npm run dev
+# Two ways to use this file.
+#
+# 1) Just a PostgreSQL for local development (the default):
+#      docker compose up -d
+#      DATABASE_URL=postgres://scheduler:scheduler@localhost:5432/scheduler npm run dev
+#
+# 2) The whole system, scaled out: three API instances behind nginx, one shared PostgreSQL,
+#    Jaeger for traces and Prometheus scraping every instance:
+#      docker compose --profile full up -d --build
+#      node scripts/load-test.mjs http://localhost:8080
+#    Web app http://localhost:8080 · Jaeger http://localhost:16686 · Prometheus http://localhost:9090
+#    Change the number of API instances with --scale api=5.
 services:
   postgres:
     image: postgres:17
@@ -14,3 +23,52 @@ services:
       test: ['CMD-SHELL', 'pg_isready -U scheduler']
       interval: 5s
       retries: 10
+
+  api:
+    profiles: [full]
+    build: ./backend
+    image: service-scheduler-api
+    # No fixed host port: every replica listens on 8081 inside the network and nginx spreads load.
+    deploy:
+      replicas: 3
+    environment:
+      DATABASE_URL: postgres://scheduler:scheduler@postgres:5432/scheduler
+      # Three instances share a 100-connection PostgreSQL comfortably.
+      DB_POOL_SIZE: '15'
+      # The browser's origin. nginx forwards /api under the upstream's host name, so to Play the
+      # web app's requests look cross-origin and must be allowed explicitly.
+      CORS_ORIGIN: http://localhost:8080
+      LOG_FORMAT: json
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    profiles: [full]
+    build: ./frontend
+    image: service-scheduler-web
+    environment:
+      API_UPSTREAM: api:8081
+    ports:
+      - '8080:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+
+  jaeger:
+    profiles: [full]
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - '16686:16686'
+
+  prometheus:
+    profiles: [full]
+    image: prom/prometheus:v3.1.0
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - '9090:9090'

@@ -14,14 +14,30 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
   SERVICE_ADVISOR: [
     { to: '/staff/board', label: 'Workshop day' },
     { to: '/staff/requests', label: 'Advice requests' },
+    { to: '/staff/workload', label: 'Workload' },
+    { to: '/parts', label: 'Parts' },
   ],
   ADMIN: [
     { to: '/staff/board', label: 'Workshop day' },
     { to: '/staff/requests', label: 'Advice requests' },
-    { to: '/admin', label: 'Bays & team' },
+    { to: '/staff/workload', label: 'Workload' },
+    { to: '/parts', label: 'Parts' },
+    { to: '/admin', label: 'Bays, team & hours' },
   ],
-  TECHNICIAN: [{ to: '/jobs', label: 'My jobs' }],
-  SYSTEM_MANAGER: [{ to: '/system', label: 'Dealerships' }],
+  WORKSHOP_CONTROLLER: [
+    { to: '/staff/board', label: 'Workshop day' },
+    { to: '/staff/workload', label: 'Workload' },
+    { to: '/parts', label: 'Parts' },
+  ],
+  PARTS_STAFF: [{ to: '/parts', label: 'Parts orders & stock' }],
+  TECHNICIAN: [
+    { to: '/jobs', label: 'My jobs' },
+    { to: '/parts', label: 'Parts' },
+  ],
+  SYSTEM_MANAGER: [
+    { to: '/system', label: 'Dealerships' },
+    { to: '/system/packages', label: 'Service packages' },
+  ],
 };
 
 export function Layout() {

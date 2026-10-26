@@ -53,7 +53,7 @@ class BookingServiceFakesSpec extends AnyFunSpec with Matchers:
 
     private val calendar = new ResourceCalendar:
       def activeResources(s: DbSession, dealershipId: String) = WorkshopResources(bays, technicians)
-      def busyPeriods(s: DbSession, dealershipId: String, from: Instant, to: Instant) = busy.toSeq
+      def busyPeriods(s: DbSession, dealershipId: String, from: Instant, to: Instant, asOf: Instant) = busy.toSeq
 
     private val writer = new AppointmentWriter:
       def insert(s: DbSession, a: NewAppointment): String =
@@ -70,6 +70,8 @@ class BookingServiceFakesSpec extends AnyFunSpec with Matchers:
       def lockForUpdate(s: DbSession, id: String) = None
       def setStatus(s: DbSession, id: String, status: AppointmentStatus, cancelReason: Option[String]) = ()
       def recordEvent(s: DbSession, e: AppointmentEvent) = ()
+      def expireHolds(s: DbSession, asOf: Instant, scope: HoldScope) = Nil
+      def reassign(s: DbSession, id: String, bayId: String, technicianId: String) = ()
 
     private val reader = new AppointmentReader:
       def get(s: DbSession, id: String) =
@@ -83,6 +85,7 @@ class BookingServiceFakesSpec extends AnyFunSpec with Matchers:
           AppointmentView.Ref(last.bayId, ""), AppointmentView.Ref(last.technicianId, ""), None, None, Now))
       def list(s: DbSession, filter: AppointmentFilter) = Nil
       def technicianIdForUser(s: DbSession, userId: String) = None
+      def jobDetails(s: DbSession, id: String) = None
 
     private val catalog = new CatalogReader:
       def listDealerships() = Seq(dealership)

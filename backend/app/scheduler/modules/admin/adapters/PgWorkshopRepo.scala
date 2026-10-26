@@ -77,3 +77,19 @@ final class PgWorkshopRepo(db: Db) extends WorkshopRepository:
     given java.sql.Connection = Sql.connection(s)
     SQL"UPDATE technicians SET is_active = $isActive WHERE id = $technicianId::uuid AND dealership_id = $dealershipId::uuid".executeUpdate() == 1
   }
+
+  def updateHours(dealershipId: String, h: WorkshopHours): Int = db.tx { s =>
+    given java.sql.Connection = Sql.connection(s)
+    SQL"""UPDATE dealerships SET opening_time = ${h.openingTime.toString}::time, closing_time = ${h.closingTime.toString}::time,
+            open_days = ${intArray(h.openDays)}, slot_minutes = ${h.slotMinutes}, min_lead_minutes = ${h.minLeadMinutes},
+            max_days_ahead = ${h.maxDaysAhead}
+          WHERE id = $dealershipId::uuid""".executeUpdate()
+    // Local wall-clock times in the dealership's own zone, compared with the new rules.
+    SQL"""
+      SELECT count(*)::int FROM appointments a JOIN dealerships d ON d.id = a.dealership_id
+      WHERE a.dealership_id = $dealershipId::uuid AND a.status IN ('HELD', 'CONFIRMED') AND lower(a.period) > now()
+        AND (NOT (extract(isodow FROM lower(a.period) AT TIME ZONE d.timezone)::int = ANY (d.open_days))
+             OR (lower(a.period) AT TIME ZONE d.timezone)::time < d.opening_time
+             OR (upper(a.period) AT TIME ZONE d.timezone)::time > d.closing_time)"""
+      .as(SqlParser.scalar[Int].single)
+  }

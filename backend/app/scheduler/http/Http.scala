@@ -14,15 +14,24 @@ import play.api.mvc.*
 import play.api.mvc.Results.*
 import play.api.routing.Router
 
-import scheduler.shared.{AppError, Log, Metrics, TransientStorageError, ValidationFailed}
+import scala.jdk.CollectionConverters.*
+
+import io.opentelemetry.api.trace.{SpanKind, StatusCode}
+import io.opentelemetry.context.Context
+import io.opentelemetry.context.propagation.TextMapGetter
+
+import scheduler.shared.{AppError, Log, Metrics, Tracing, TransientStorageError, ValidationFailed}
 
 /** Values the API filter attaches to every request. */
 object RequestContext:
   val RequestId: TypedKey[String] = TypedKey("requestId")
   val Logger: TypedKey[Log] = TypedKey("log")
+  val Trace: TypedKey[Context] = TypedKey("trace")
 
   def requestId(rh: RequestHeader): String = rh.attrs.get(RequestId).getOrElse("unknown")
   def log(rh: RequestHeader): Log = rh.attrs.get(Logger).getOrElse(Log())
+  /** The request's server span, to make current on the thread that runs the use case. */
+  def trace(rh: RequestHeader): Context = rh.attrs.get(Trace).getOrElse(Context.root())
 
 /**
  * Where use cases run. JDBC and password hashing block, so every use case runs on its own
@@ -30,7 +39,8 @@ object RequestContext:
  * thousand waiting requests cost memory, not a thousand threads. Play's own threads never block.
  */
 object Blocking:
-  given ExecutionContext = ExecutionContext.fromExecutorService(Executors.newVirtualThreadPerTaskExecutor())
+  // Context.taskWrapping carries the current trace span over to the virtual thread.
+  given ExecutionContext = ExecutionContext.fromExecutorService(Context.taskWrapping(Executors.newVirtualThreadPerTaskExecutor()))
 
 /** One error format for the whole API: `{"error": {"code", "message", "details"?, "requestId"}}`. */
 object ErrorMapper:
@@ -67,7 +77,21 @@ final class ApiFilter(baseLog: Log)(using ec: ExecutionContext) extends Essentia
   def apply(next: EssentialAction): EssentialAction = EssentialAction { rh =>
     val started = System.nanoTime()
     val requestId = rh.headers.get("X-Request-Id").filter(ValidId.matches).getOrElse(UUID.randomUUID().toString)
-    val tagged = rh.addAttr(RequestContext.RequestId, requestId).addAttr(RequestContext.Logger, baseLog.child("requestId" -> requestId))
+    val route = ApiFilter.route(rh)
+    // A server span per request, continuing the caller's trace when it sent a traceparent header.
+    val span = Tracing.tracer.spanBuilder(s"${rh.method} $route")
+      .setParent(Tracing.propagator.extract(Context.root(), rh, ApiFilter.HeaderGetter))
+      .setSpanKind(SpanKind.SERVER)
+      .setAttribute("http.request.method", rh.method)
+      .setAttribute("http.route", route)
+      .setAttribute("url.path", rh.path)
+      .setAttribute("request.id", requestId)
+      .startSpan()
+    val traceId = span.getSpanContext.getTraceId
+    val tagged = rh
+      .addAttr(RequestContext.RequestId, requestId)
+      .addAttr(RequestContext.Logger, baseLog.child("requestId" -> requestId, "traceId" -> traceId))
+      .addAttr(RequestContext.Trace, Context.root().`with`(span))
 
     val accumulator: Accumulator[ByteString, Result] =
       try next(tagged)
@@ -75,13 +99,16 @@ final class ApiFilter(baseLog: Log)(using ec: ExecutionContext) extends Essentia
     accumulator
       .recover { case e: Exception => ErrorMapper.toResult(tagged, e) }
       .map { result =>
-        record(tagged, result.header.status, (System.nanoTime() - started) / 1e6)
-        result.withHeaders("X-Request-Id" -> requestId)
+        val status = result.header.status
+        record(tagged, route, status, (System.nanoTime() - started) / 1e6)
+        span.setAttribute("http.response.status_code", status.toLong)
+        if status >= 500 then span.setStatus(StatusCode.ERROR)
+        span.end()
+        result.withHeaders("X-Request-Id" -> requestId, "X-Trace-Id" -> traceId, "X-Served-By" -> ApiFilter.Instance)
       }
   }
 
-  private def record(rh: RequestHeader, status: Int, ms: Double): Unit =
-    val route = rh.attrs.get(Router.Attrs.HandlerDef).map(h => ApiFilter.routePattern(h.path)).getOrElse("unmatched")
+  private def record(rh: RequestHeader, route: String, status: Int, ms: Double): Unit =
     Metrics.httpDuration.labelValues(rh.method, route, status.toString).observe(ms / 1000)
     if route != "/metrics" && route != "/health" then // keep probe noise out of the logs
       val log = RequestContext.log(rh)
@@ -93,6 +120,20 @@ final class ApiFilter(baseLog: Log)(using ec: ExecutionContext) extends Essentia
 object ApiFilter:
   /** "/api/appointments/$id<[^/]+>" (Play's route syntax) → "/api/appointments/:id". */
   def routePattern(path: String): String = path.replaceAll("""\$(\w+)<[^>]+>""", ":$1")
+
+  def route(rh: RequestHeader): String = rh.attrs.get(Router.Attrs.HandlerDef).map(h => routePattern(h.path)).getOrElse("unmatched")
+
+  /**
+   * Which API instance answered (the container's host name). Behind a load balancer this
+   * shows requests being spread over the instances.
+   */
+  val Instance: String =
+    sys.env.get("CONTAINER_APP_REPLICA_NAME").orElse(sys.env.get("HOSTNAME")).filter(_.nonEmpty)
+      .getOrElse(java.net.InetAddress.getLocalHost.getHostName)
+
+  private object HeaderGetter extends TextMapGetter[RequestHeader]:
+    def keys(rh: RequestHeader): java.lang.Iterable[String] = rh.headers.keys.toSeq.asJava
+    def get(rh: RequestHeader, key: String): String = rh.headers.get(key).orNull
 
 /** Errors Play raises itself (no route, malformed JSON, body too large) in the same JSON format. */
 final class JsonErrorHandler extends HttpErrorHandler:

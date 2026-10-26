@@ -49,6 +49,23 @@ object Metrics:
     .help("Repeated booking requests answered from an earlier result (same Idempotency-Key)")
     .register(registry)
 
+  val holds: Counter = Counter.builder()
+    .name("booking_holds_total")
+    .help("Temporary holds by event: created, confirmed, released (cancelled by the customer), expired")
+    .labelNames("event")
+    .register(registry)
+
+  val reassignments: Counter = Counter.builder()
+    .name("appointment_reassignments_total")
+    .help("Jobs moved to another bay or technician by a workshop controller")
+    .register(registry)
+
+  val partOrders: Counter = Counter.builder()
+    .name("part_orders_total")
+    .help("Parts order events: created, or the status an order moved to")
+    .labelNames("event")
+    .register(registry)
+
   val appointmentStatusChanges: Counter = Counter.builder()
     .name("appointment_status_changes_total")
     .help("Appointment lifecycle transitions")

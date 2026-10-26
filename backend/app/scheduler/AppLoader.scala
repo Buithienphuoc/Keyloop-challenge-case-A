@@ -1,8 +1,10 @@
 package scheduler
 
 import java.time.Instant
+import java.util.concurrent.{Executors, TimeUnit}
 
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 import play.api.*
 import play.api.ApplicationLoader.Context
@@ -22,8 +24,10 @@ import scheduler.modules.identity.adapters.{IdentityController, PgIdentityRepo}
 import scheduler.modules.identity.application.IdentityService
 import scheduler.modules.scheduling.adapters.{PgSchedulingStore, SchedulingController}
 import scheduler.modules.scheduling.application.*
-import scheduler.modules.system.adapters.{PgTenantRepo, SystemController}
-import scheduler.modules.system.application.TenantService
+import scheduler.modules.parts.adapters.{PartsController, PgPartsRepo}
+import scheduler.modules.parts.application.PartsService
+import scheduler.modules.system.adapters.{PgPackageRepo, PgTenantRepo, SystemController}
+import scheduler.modules.system.application.{PackageAdminService, TenantService}
 import scheduler.modules.vehicles.adapters.{PgVehicleRepo, VehicleController}
 import scheduler.modules.vehicles.application.VehicleService
 import scheduler.shared.*
@@ -60,8 +64,21 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
   if config.seedDemoData then Seed.demoData(db, log, clock())
   Metrics.registerJvmMetrics()
 
+  // Every instance runs the sweeper; instances never wait on each other (see HoldSweeper).
+  private val background = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().name("hold-sweeper").factory())
+  if config.holdSweepSeconds > 0 then
+    background.scheduleWithFixedDelay(
+      () =>
+        try holdSweeper.sweep()
+        catch case NonFatal(e) => log.error("holds.sweep_failed", e),
+      config.holdSweepSeconds.toLong,
+      config.holdSweepSeconds.toLong,
+      TimeUnit.SECONDS
+    )
+
   applicationLifecycle.addStopHook { () =>
     log.info("server.shutting_down")
+    background.shutdownNow()
     db.close()
     embedded.foreach(_.stop())
     Future.unit
@@ -78,10 +95,14 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
   val consultations = ConsultationService(db, PgConsultationRepo(db), vehicles, catalog)
   private val workshop = WorkshopContext(catalog, consultations)
   val availability = AvailabilityService(db, store, workshop, clock)
-  val booking = BookingService(db, store, store, store, consultations, vehicles, workshop, availability, clock)
+  val booking = BookingService(db, store, store, store, consultations, vehicles, workshop, availability, clock, config.holdMinutes)
   val appointments = AppointmentService(db, store, store, consultations, workshop, clock)
+  val dispatch = DispatchService(db, store, store, store, consultations, workshop, clock)
+  val holdSweeper = HoldSweeper(db, store, consultations, clock, log)
   val admin = WorkshopAdminService(db, PgWorkshopRepo(db), identity)
   val tenants = TenantService(db, PgTenantRepo(db), identity)
+  val packages = PackageAdminService(PgPackageRepo(db))
+  val parts = PartsService(db, PgPartsRepo(db))
 
   // ---- driving adapters (HTTP) ---------------------------------------------------------------
   private val guard = Guard(identity, controllerComponents.parsers.defaultBodyParser)
@@ -93,10 +114,11 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
     IdentityController(controllerComponents, guard, identity),
     CatalogController(controllerComponents, catalog),
     VehicleController(controllerComponents, guard, vehicles),
-    SchedulingController(controllerComponents, guard, availability, booking, appointments),
+    SchedulingController(controllerComponents, guard, availability, booking, appointments, dispatch),
     ConsultationController(controllerComponents, guard, consultations),
     AdminController(controllerComponents, guard, admin),
-    SystemController(controllerComponents, guard, tenants),
+    SystemController(controllerComponents, guard, tenants, packages),
+    PartsController(controllerComponents, guard, parts),
     OpsController(controllerComponents, environment, () => db.isUp())
   )
 

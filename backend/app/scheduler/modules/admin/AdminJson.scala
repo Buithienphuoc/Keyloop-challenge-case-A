@@ -2,15 +2,22 @@ package scheduler.modules.admin
 
 import play.api.libs.json.*
 
-import scheduler.modules.admin.application.{BayCreated, WorkshopView}
+import scheduler.modules.admin.application.{BayCreated, HoursUpdated, WorkshopView}
 import scheduler.modules.identity.StaffMember
-import scheduler.shared.JsonFormats.given
+import scheduler.shared.JsonFormats.{hhmm, given}
 
 /** JSON shapes of the administration API. */
 object AdminJson:
   given OWrites[BayRecord] = Json.writes[BayRecord]
   given OWrites[TechnicianRecord] = Json.writes[TechnicianRecord]
   given OWrites[BayCreated] = Json.writes[BayCreated]
+
+  given OWrites[HoursUpdated] = OWrites { u =>
+    val h = u.hours
+    Json.obj("openingTime" -> hhmm(h.openingTime), "closingTime" -> hhmm(h.closingTime), "openDays" -> h.openDays,
+      "slotMinutes" -> h.slotMinutes, "minLeadMinutes" -> h.minLeadMinutes, "maxDaysAhead" -> h.maxDaysAhead,
+      "upcomingOutsideHours" -> u.upcomingOutsideHours)
+  }
 
   given OWrites[StaffMember] = OWrites { m =>
     Json.obj("id" -> m.user.id, "fullName" -> m.user.fullName, "email" -> m.user.email, "phone" -> m.user.phone,

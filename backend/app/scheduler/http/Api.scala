@@ -23,6 +23,11 @@ final class Guard(authenticator: Authenticator, parser: BodyParser[AnyContent]):
     protected val executionContext: ExecutionContext = summon[ExecutionContext]
 
     def invokeBlock[A](request: Request[A], block: AuthRequest[A] => Future[Result]): Future[Result] =
+      // The use case runs on virtual threads; make the request's span current so the task
+      // wrapper in Blocking carries it there (and DB spans become its children).
+      scala.util.Using.resource(RequestContext.trace(request).makeCurrent())(_ => run(request, block))
+
+    private def run[A](request: Request[A], block: AuthRequest[A] => Future[Result]): Future[Result] =
       Future {
         val token = Guard.bearerToken(request).getOrElse(throw AppError.unauthorized())
         val auth = authenticator.authenticate(token).getOrElse(throw AppError.unauthorized("Your session has expired. Please sign in again."))

@@ -18,6 +18,9 @@ object AppointmentService:
       AppError.conflict("NOT_STARTED_YET", "You can only mark a no-show after the start time"))
   )
 
+  private enum HoldOutcome:
+    case Confirmed, AlreadyConfirmed, Expired
+
 /** Viewing appointments and moving them through their lifecycle. */
 final class AppointmentService(
     db: Db,
@@ -69,8 +72,45 @@ final class AppointmentService(
       if to == AppointmentStatus.CANCELLED then a.consultationRequestId.foreach(consultations.reopen(s, _))
       a.status
     }
+    if from == AppointmentStatus.HELD then Metrics.holds.labelValues("released").inc()
     Metrics.appointmentStatusChanges.labelValues(to.toString).inc()
     log.info("appointment.status_changed", "appointmentId" -> id, "from" -> from, "to" -> to)
+    db.run(reader.get(_, id)).get
+
+  /**
+   * HELD → CONFIRMED, while the hold is still running. Confirming twice answers with the
+   * same booking. A hold that ran out is released on the spot (409 HOLD_EXPIRED), so the
+   * customer is never told a slot is theirs after someone else could have taken it.
+   */
+  def confirmHold(auth: AuthContext, id: String, log: Log): AppointmentView =
+    import AppointmentService.HoldOutcome
+    val outcome = db.tx { s =>
+      val a = writer.lockForUpdate(s, id).getOrElse(throw AppError.notFound("Appointment"))
+      if a.customerId != auth.userId then throw AppError.notFound("Appointment")
+      a.status match
+        case AppointmentStatus.CONFIRMED => HoldOutcome.AlreadyConfirmed
+        case AppointmentStatus.HELD if a.holdExpiresAt.exists(_.isAfter(clock())) =>
+          writer.setStatus(s, id, AppointmentStatus.CONFIRMED, None)
+          writer.recordEvent(s, AppointmentEvent(id, Some(AppointmentStatus.HELD), AppointmentStatus.CONFIRMED, auth.userId, None))
+          HoldOutcome.Confirmed
+        case AppointmentStatus.HELD =>
+          writer.setStatus(s, id, AppointmentStatus.EXPIRED, None)
+          writer.recordEvent(s, AppointmentEvent(id, Some(AppointmentStatus.HELD), AppointmentStatus.EXPIRED, auth.userId, Some("Hold expired")))
+          a.consultationRequestId.foreach(consultations.reopen(s, _))
+          HoldOutcome.Expired
+        case AppointmentStatus.EXPIRED => HoldOutcome.Expired
+        case other => throw AppError.conflict("NOT_HELD", s"This appointment is $other, not on hold")
+    }
+    outcome match
+      case HoldOutcome.Expired =>
+        Metrics.holds.labelValues("expired").inc()
+        log.info("booking.hold_expired_on_confirm", "appointmentId" -> id)
+        throw AppError.conflict("HOLD_EXPIRED", "Your hold on this time has run out. Please choose a time again.")
+      case HoldOutcome.Confirmed =>
+        Metrics.holds.labelValues("confirmed").inc()
+        Metrics.appointmentStatusChanges.labelValues(AppointmentStatus.CONFIRMED.toString).inc()
+        log.info("booking.hold_confirmed", "appointmentId" -> id)
+      case HoldOutcome.AlreadyConfirmed => ()
     db.run(reader.get(_, id)).get
 
   private def assertCanSee(s: DbSession, auth: AuthContext, view: AppointmentView): Unit =

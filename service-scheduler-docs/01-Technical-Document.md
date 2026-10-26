@@ -4,10 +4,10 @@
 
 | | |
 | --- | --- |
-| Version | 2.0 (English edition) |
+| Version | 2.1 (English edition) |
 | Date | 25 October 2026 |
 | Based on | The shared Vietnamese working document "Khảo sát hệ thống đặt lịch bảo dưỡng – Keyloop & đại lý" (revision 14) |
-| Changes from the Vietnamese edition | Translated into English, and updated to the delivered build: the backend now runs on Scala 3 + Play 3, so the sections on the first code version, concurrency and the SOLID review describe the Scala code |
+| Changes from the Vietnamese edition | Translated into English, and updated to the delivered build: the backend now runs on Scala 3 + Play 3, so the sections on the first code version, concurrency and the SOLID review describe the Scala code. 2.1 adds the features built afterwards (holds, workshop controller, parts, opening hours, package catalogue, tracing), scaling out (5.4) and delivery (4.5) |
 
 ## 1. Summary
 
@@ -42,11 +42,11 @@ one module so that double booking is prevented inside one transaction.
 | Architecture | Hexagonal per module (light "Hive"): Scheduling, Catalog, Customer & Vehicle | Boundaries follow data-consistency boundaries; the compiler checks wrong imports | Seven modules (scheduling, consultation, vehicles, catalog, identity, admin, system) in one sbt project; `ArchitectureSpec` enforces the dependency rule |
 | Scheduling boundary | Appointment, ServiceBay, Technician, Skill in one module | The no-overlap invariant needs one transaction; splitting would need a saga | As decided |
 | Multi-dealership | Every row carries `dealershipId` | Matches the multi-tenant model of servicestorefront | As decided; tests check that staff of one dealership cannot see or change another |
-| Extra features | Alternative slots when full; idempotency key for `POST /appointments`; optional HOLD → CONFIRM | Product thinking; ready for AI agents to call | Alternatives and idempotency key built. HOLD → CONFIRM not built (future work) |
+| Extra features | Alternative slots when full; idempotency key for `POST /appointments`; optional HOLD → CONFIRM | Product thinking; ready for AI agents to call | All three built: alternatives, idempotency key, and HOLD → CONFIRM with a 10-minute expiry |
 | Chatbot / LLM | Not built; recorded as future work, linked to Keyloop's AIME | Outside the brief, dilutes the core | As decided |
-| Batch | No batch framework; expired HOLDs filtered in the query; Pekko Scheduler for any small job | The brief has no real batch processing | No batch jobs needed |
+| Batch | No batch framework; expired HOLDs filtered in the query; Pekko Scheduler for any small job | The brief has no real batch processing | Expired holds are ignored in availability queries and released by a small sweeper on a virtual thread (`HoldSweeper`, every 30 s, `FOR UPDATE SKIP LOCKED` so several instances never fight) |
 | Testing | ScalaTest + ScalaCheck (property-based, no-overlap invariant) + Testcontainers | Verifies AI-written code better than a few unit tests | ScalaTest + ScalaCheck; **embedded PostgreSQL (Zonky)** instead of Testcontainers, so tests need no Docker but still run on the real engine |
-| Observability | Structured logs with correlation ID; OpenTelemetry; metric `booking_conflicts_total` | Actually implemented, not just listed | JSON logs with request ID, Prometheus metrics including `booking_conflicts_total`, audit trail. OpenTelemetry tracing is future work |
+| Observability | Structured logs with correlation ID; OpenTelemetry; metric `booking_conflicts_total` | Actually implemented, not just listed | JSON logs with request ID, Prometheus metrics including `booking_conflicts_total`, audit trail, and OpenTelemetry tracing (request, booking attempt and SQL spans, exported to Jaeger over OTLP) |
 | Sample data | Seed makes and models from NHTSA vPIC; optional VIN check with timeout and fallback | Free API, no key; booking must not depend hard on an outside service | Own Vietnamese seed data; VIN format checked locally. vPIC not used |
 | Working with AI | Write the spec and invariants first; log in `docs/ai-log.md` every AI mistake and its fix; small commits | AI Engineering & Verification carries the most weight | 12 entries in `docs/ai-log.md` |
 
@@ -60,13 +60,13 @@ the design documents; the column only says whether it has code.
 | Role | What they do | Source | Priority | Built |
 | --- | --- | --- | --- | --- |
 | System manager | Runs the whole platform, creates and manages dealerships | Original | Future work | **Yes** (onboard and monitor dealerships) |
-| Admin (dealership) | Configures bays, technicians, skills, service packages and opening hours of one dealership | Original | Submission | Yes (bays, technicians, staff; packages and hours are seeded) |
+| Admin (dealership) | Configures bays, technicians, skills, service packages and opening hours of one dealership | Original | Submission | Yes (bays, technicians, staff, opening hours; the package catalogue is managed by the system manager) |
 | Sales | Advises on customisation, sells parts and extra services | Original | Future work | Covered by the service advisor role |
 | Technician | Sees assigned jobs, updates job status | Original | If time allows | **Yes** |
 | Customer (added) | Registers vehicles, books, views and cancels, sends advice requests | servicestorefront booking flow | Submission | Yes |
 | Service advisor (added) | Receives customers, advises before booking, confirms bookings | Keyloop API is built around advisors | Submission | Yes |
-| Workshop controller (added) | Sees workshop load, moves a job to another bay or technician | Tribe AI case study: workshop administrators schedule technicians | Future work | No |
-| Parts staff (added) | Handles parts orders | Keyloop Parts Catalogue API has a Parts Advisor role | Future work | No |
+| Workshop controller (added) | Sees workshop load, moves a job to another bay or technician | Tribe AI case study: workshop administrators schedule technicians | Future work | **Yes** (workload view per bay and technician; move a job, checked by the same constraints) |
+| Parts staff (added) | Handles parts orders | Keyloop Parts Catalogue API has a Parts Advisor role | Future work | **Yes** (stock list and parts orders) |
 
 Simplification adopted: Sales is merged into Service advisor, because both advise before booking.
 
@@ -78,7 +78,7 @@ Simplification adopted: Sales is merged into Service advisor, because both advis
 | Maintenance packages (main feature) | Customers who know little about vehicles pick a ready-made package with a checklist, duration, required skill and bay type | Vehicle → package → dealership → slot → confirm | Submission | Yes |
 | Inspection on request, with advice | The customer names what to check; an advisor assesses first, then the booking is made | Request → advisor sets duration and skill → customer picks a slot | If time allows | **Yes** |
 | Customisation with advice (secondary) | Same advice flow as inspection on request | As above, plus a quote | Future work | **Yes** |
-| Replacement parts ordering | Order parts, optionally attached to an appointment | A separate domain (stock, price, orders); Keyloop has its own Order Parts API | Future work | No |
+| Replacement parts ordering | Order parts, optionally attached to an appointment | A separate domain (stock, price, orders); Keyloop has its own Order Parts API | Future work | **Yes**, as its own `parts` module: REQUESTED → ORDERED → RECEIVED → ISSUED; issuing locks the stock rows and a `CHECK (stock_qty >= 0)` stops two people issuing the last unit |
 
 Inspection on request and customisation share one mechanism, "advice request → appointment".
 Building it once served both.
@@ -96,18 +96,22 @@ expected values. The TypeScript backend was then removed.
 
 ### 4.2 What is built
 
-- **Roles:** sign-in and sign-out for five roles (Customer, Service advisor, Technician, Dealership
-  admin, System manager).
+- **Roles:** sign-in and sign-out for seven roles (Customer, Service advisor, Technician, Dealership
+  admin, System manager, Workshop controller, Parts staff).
 - **Customer:** maintenance packages, inspection on request and customisation through the advice
-  flow, appointments, cancellation, vehicles, add to calendar.
+  flow, appointments, cancellation, vehicles, add to calendar. The chosen time is **held for 10
+  minutes** (HELD) while the customer reviews it, with a countdown, then confirmed (CONFIRMED).
 - **Staff:** the advisor's workshop-day board, the technician's job list, management of bays,
-  technicians and staff, dealership onboarding.
+  technicians, staff and opening hours, dealership onboarding, the service package catalogue, the
+  workshop controller's workload view and job moves, parts stock and parts orders.
 - **Double-booking protection:** three exclusion constraints (bay, technician, vehicle); retry
   after a lost race; idempotency key; three nearest alternatives when a slot has just been taken.
 - **Logging:** JSON logs with a request ID that flows from the browser to the server, Prometheus
-  metrics, an audit trail of appointment status changes.
-- **Not built:** parts ordering, rescheduling (today: cancel and rebook), SMS / Zalo
-  notifications, OpenTelemetry tracing, HOLD → CONFIRM.
+  metrics, an audit trail of appointment status changes, OpenTelemetry traces.
+- **Delivery:** Docker images, a scaled-out docker-compose profile, a GitHub Actions pipeline and
+  Azure Container Apps (see 4.5).
+- **Not built:** rescheduling (today: cancel and rebook), SMS / Zalo notifications, breaks and
+  holidays in shifts, multi-technician jobs.
 - **AI log:** `docs/ai-log.md` records 12 real defects caught in AI-written code, for the AI
   Collaboration Narrative.
 
@@ -146,6 +150,21 @@ expected values. The TypeScript backend was then removed.
 
 The data model is drawn in `diagrams/erd.png`: business tables in green, authentication and
 authorisation tables in red, framework tables in orange.
+
+### 4.5 Delivery: containers, CI/CD and Azure
+
+| Piece | File | What it does |
+| --- | --- | --- |
+| API image | `backend/Dockerfile` | sbt builds and stages the Play app; the runtime image is a Java 21 JRE running as a non-root user, with a health check on `/health` |
+| Web image | `frontend/Dockerfile`, `frontend/nginx.conf.template` | Vite build served by nginx, which also forwards `/api`, `/docs` and `/health` to the API, so the browser sees one origin and needs no CORS |
+| Scaled-out local run | `docker-compose.yml` (profile `full`) | 3 API instances, nginx, one PostgreSQL, Jaeger and Prometheus (which finds every API instance by DNS) |
+| End-to-end tests | `e2e/` | Selenium (Scala, ScalaTest) drives Chrome through the web app: one booking across five roles (customer, advisor, workshop controller, technician, parts staff), sign-in rules, and the back office (admin, system manager). 26 tests, run in CI against the built images |
+| Pipeline | `.github/workflows/ci-cd.yml` | Every pull request: backend tests, web lint and build, both images built, end-to-end tests against them. Push to `master`: images pushed to Azure Container Registry, rolled out to Azure Container Apps, then the live site is smoke-tested |
+| Azure set-up | `deploy/azure/setup.sh` | One script for Cloud Shell: registry, PostgreSQL Flexible Server, the Container Apps environment and both apps, and a managed identity that GitHub signs in as with OpenID Connect (no stored password) |
+
+On Azure the API is internal only and scales from 1 to 5 replicas on concurrent HTTP requests;
+the web app is the only public endpoint (HTTPS). The region is Japan East, one of the regions an
+Azure for Students subscription allows.
 
 ## 5. Concurrency and load
 
@@ -194,6 +213,34 @@ virtual thread, so blocking JDBC code stays simple and 1000 waiting requests cos
 threads. Correctness under contention lives in database constraints, and a 1000-request load test
 proves it." Details: the Load test section of the README and entries 6, 7, 11 and 12 in
 `docs/ai-log.md`.
+
+### 5.4 Scaling out: several instances, one set of rules
+
+Scala's name comes from "scalable"; here scaling means adding instances, not changing code.
+Nothing that decides correctness lives in an instance's memory:
+
+| Concern | Where it lives | Why more instances are safe |
+| --- | --- | --- |
+| No double booking | PostgreSQL `EXCLUDE` constraints on bay, technician and vehicle | The database refuses the second booking whichever instance sent it |
+| Sign-in | `sessions` table (hashed tokens) | Any instance can check any token; no sticky sessions |
+| Idempotency key | Advisory lock per customer + key, unique index | Two instances replaying one key queue on the same lock |
+| Expired holds | `HoldSweeper` with `FOR UPDATE SKIP LOCKED` on every instance | Each expired hold is released once; instances skip rows another one is handling |
+| Demo data | Advisory lock around the seed | Instances starting together seed once |
+| Parts stock | Row locks in id order + `CHECK (stock_qty >= 0)` | The last unit cannot be issued twice |
+| Tracing | W3C `traceparent` continued by each instance | One trace follows a request across nginx and any replica |
+
+Every response carries `X-Served-By` (the replica name) and `X-Trace-Id`, so spreading is
+visible from outside. `scripts/load-test.mjs` checks it against a running deployment. Measured on
+25 October 2026 with `docker compose --profile full` (3 API instances, one PostgreSQL, all on one
+2-vCPU machine):
+
+| Test | Result |
+| --- | --- |
+| 1000 availability reads, 50 at a time, through nginx | 1000 × 200; 332 / 335 / 333 answered by the three instances |
+| 15 vehicles book the same 08:00 slot at once (3 free bay + technician pairs) | exactly 3 × 201 and 12 × 409; the requests were spread 5 / 5 / 5 over the instances, so the race was decided by PostgreSQL, not by a lock in one process |
+
+Jaeger showed each booking as one trace: the HTTP span, the `booking.attempt` span and its SQL
+spans; Prometheus scraped all three instances.
 
 ## 6. SOLID review (25 October 2026)
 
@@ -301,7 +348,7 @@ These points come from public documentation and were not verified on the live in
 | Free slots are computed per advisor | Check at the same time that a bay and a technician with the right skill are free for the whole job | Yes |
 | Double-booking protection depends on the DMS | Enforce it in the database with PostgreSQL exclusion constraints, proved by a concurrency test | Yes |
 | When a slot is full, the customer searches for another time alone | Return the few nearest free slots when the requested time is taken | Yes |
-| No visible hold while the customer fills in the form | A temporary hold with an expiry (HOLD → CONFIRM) | No (future work) |
+| No visible hold while the customer fills in the form | A temporary hold with an expiry (HOLD → CONFIRM) | Yes (10 minutes, countdown in the booking page) |
 | No visible protection against pressing Book twice | Idempotency key for `POST /appointments`, useful also for AI agents such as AIME or Autoflows | Yes |
 | Cancellation only before work starts | Keep the rule and model the appointment states explicitly | Yes (state machine in `domain/Lifecycle.scala`) |
 | Multi-tenant through subdomains | Tie every row to `dealershipId` from the start | Yes |

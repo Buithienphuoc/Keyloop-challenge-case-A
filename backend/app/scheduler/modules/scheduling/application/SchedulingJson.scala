@@ -3,7 +3,7 @@ package scheduler.modules.scheduling.application
 import play.api.libs.json.*
 
 import scheduler.modules.catalog.CatalogJson.given
-import scheduler.modules.scheduling.domain.Slot
+import scheduler.modules.scheduling.domain.{ResourceLoad, Slot}
 import scheduler.shared.JsonFormats.{*, given}
 
 /** JSON shapes of the scheduling API (see conf/openapi.yaml). */
@@ -22,3 +22,16 @@ object SchedulingJson:
   given OWrites[AppointmentView.ServiceInfo] = Json.writes[AppointmentView.ServiceInfo]
   given OWrites[AppointmentView.Ref] = Json.writes[AppointmentView.Ref]
   given OWrites[AppointmentView] = Json.writes[AppointmentView]
+
+  private def load(r: ResourceLoad, tagsKey: String, tags: JsValue): JsObject =
+    Json.obj("id" -> r.id, "name" -> r.name, tagsKey -> tags, "availableMinutes" -> r.availableMinutes,
+      "bookedMinutes" -> r.bookedMinutes, "jobs" -> r.jobs, "utilisation" -> r.utilisation)
+
+  given OWrites[WorkloadView] = OWrites { w =>
+    Json.obj(
+      "date" -> w.date,
+      "timezone" -> w.timezone,
+      "technicians" -> w.load.technicians.map(t => load(t, "skills", Json.toJson(t.tags))),
+      "bays" -> w.load.bays.map(b => load(b, "bayType", JsString(b.tags.headOption.getOrElse(""))))
+    )
+  }

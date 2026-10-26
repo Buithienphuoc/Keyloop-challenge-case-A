@@ -26,8 +26,8 @@ final class AvailabilityService(db: Db, calendar: ResourceCalendar, workshop: Wo
     val requirement = workshop.requirementFor(s, auth, dealership.id, query)
     val rules = rulesOf(dealership)
     val WorkshopResources(bays, technicians) = calendar.activeResources(s, dealership.id)
-    val busy = calendar.busyPeriods(s, dealership.id, dayStart(query.date, rules), dayStart(query.date.plusDays(1), rules))
     val now = clock()
+    val busy = calendar.busyPeriods(s, dealership.id, dayStart(query.date, rules), dayStart(query.date.plusDays(1), rules), now)
     AvailabilityResponse(
       dealershipId = dealership.id,
       date = query.date,
@@ -56,7 +56,7 @@ final class AvailabilityService(db: Db, calendar: ResourceCalendar, workshop: Wo
       // Lazy: days are only loaded until `limit` free slots have been found (at most two weeks).
       LazyList.range(0, 14).flatMap { i =>
         val day = requested.toLocalDate.plusDays(i)
-        val busy = calendar.busyPeriods(s, dealershipId, dayStart(day, rules), dayStart(day.plusDays(1), rules))
+        val busy = calendar.busyPeriods(s, dealershipId, dayStart(day, rules), dayStart(day.plusDays(1), rules), now)
         val free = Availability.daySlots(rules, day, requirement, bays, technicians, busy, now).filter(_.available)
         if i == 0 then free.sortBy(slot => math.abs(slot.start.toInstant.toEpochMilli - requestedMs)) else free
       }.take(limit).toList

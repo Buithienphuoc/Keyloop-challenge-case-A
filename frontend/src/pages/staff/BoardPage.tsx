@@ -52,7 +52,7 @@ export function BoardPage() {
   for (let h = Math.ceil(open / 60); h * 60 <= close; h++) hours.push(h);
 
   const list = appointments.data ?? [];
-  const active = list.filter((a) => a.status !== 'CANCELLED');
+  const active = list.filter((a) => a.status !== 'CANCELLED' && a.status !== 'EXPIRED');
   const selected = list.find((a) => a.id === selectedId) ?? null;
   const nowLocal = DateTime.now().setZone(zone);
   const showNow = nowLocal.toISODate() === date && nowLocal.hour * 60 + nowLocal.minute > open && nowLocal.hour * 60 + nowLocal.minute < close;
@@ -121,7 +121,7 @@ export function BoardPage() {
 
         <aside>
           {selected ? (
-            <JobPanel a={selected} date={date} onClose={() => setSelectedId(null)} />
+            <JobPanel a={selected} date={date} resources={resources.data} onClose={() => setSelectedId(null)} />
           ) : (
             <div className="panel panel-tight stack">
               <h3>Jobs today</h3>
@@ -148,8 +148,11 @@ export function BoardPage() {
   );
 }
 
-function JobPanel({ a, date, onClose }: { a: Appointment; date: string; onClose: () => void }) {
+function JobPanel({ a, date, resources, onClose }: { a: Appointment; date: string; resources?: Resources; onClose: () => void }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canMove = user?.role === 'WORKSHOP_CONTROLLER' || user?.role === 'ADMIN';
+  const canChangeStatus = user?.role !== 'WORKSHOP_CONTROLLER';
   const change = useMutation({
     mutationFn: (status: AppointmentStatus) =>
       status === 'CANCELLED'
@@ -213,7 +216,9 @@ function JobPanel({ a, date, onClose }: { a: Appointment; date: string; onClose:
         </ul>
       )}
       <ErrorNote error={change.error} />
-      <div className="row">
+      {a.status === 'HELD' && <p className="muted small">The customer is confirming this time right now; it is released if they do not.</p>}
+      {canMove && a.status === 'CONFIRMED' && resources && <MoveJob a={a} date={date} resources={resources} />}
+      {canChangeStatus && <div className="row">
         {a.status === 'CONFIRMED' && (
           <button className="btn btn-primary btn-sm" disabled={change.isPending} onClick={() => change.mutate('IN_PROGRESS')}>
             Vehicle arrived, start work
@@ -234,8 +239,80 @@ function JobPanel({ a, date, onClose }: { a: Appointment; date: string; onClose:
             Cancel booking
           </button>
         )}
-      </div>
+      </div>}
       <p className="muted small">Booked {stamp(a.createdAt, a.dealership.timezone)}</p>
     </div>
+  );
+}
+
+/**
+ * Moves a job to another bay and/or technician. The lists only offer bays of the same type;
+ * the server still checks skills, shifts and clashes, and explains a refusal.
+ */
+function MoveJob({ a, date, resources }: { a: Appointment; date: string; resources: Resources }) {
+  const qc = useQueryClient();
+  const currentBay = resources.bays.find((b) => b.id === a.bay.id);
+  const [bayId, setBayId] = useState(a.bay.id);
+  const [technicianId, setTechnicianId] = useState(a.technician.id);
+  const [reason, setReason] = useState('');
+  const move = useMutation({
+    mutationFn: () =>
+      post<Appointment>(`/api/appointments/${a.id}/reassign`, {
+        bayId: bayId !== a.bay.id ? bayId : undefined,
+        technicianId: technicianId !== a.technician.id ? technicianId : undefined,
+        reason: reason || undefined,
+      }),
+    onSuccess: () => {
+      setReason('');
+      qc.invalidateQueries({ queryKey: ['staff', 'appointments', date] });
+      qc.invalidateQueries({ queryKey: ['staff', 'workload', date] });
+    },
+  });
+  const unchanged = bayId === a.bay.id && technicianId === a.technician.id;
+
+  return (
+    <form
+      className="stack"
+      style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        move.mutate();
+      }}
+    >
+      <h4>Move this job</h4>
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="mv-bay">Bay</label>
+          <select id="mv-bay" className="input" value={bayId} onChange={(e) => setBayId(e.target.value)}>
+            {resources.bays
+              .filter((b) => b.bayType === currentBay?.bayType)
+              .map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="mv-tech">Technician</label>
+          <select id="mv-tech" className="input" value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
+            {resources.technicians.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="field">
+        <label htmlFor="mv-reason">Why (optional)</label>
+        <input id="mv-reason" className="input" placeholder="Hùng is off sick" value={reason} onChange={(e) => setReason(e.target.value)} />
+      </div>
+      <ErrorNote error={move.error} />
+      {move.isSuccess && <div className="notice notice-ok">Moved. The technician sees it in their jobs straight away.</div>}
+      <button className="btn btn-sm btn-primary" disabled={unchanged || move.isPending}>
+        Move job
+      </button>
+    </form>
   );
 }
