@@ -13,6 +13,14 @@ Entry format:
 
 ## Unreleased
 
+### Every demo technician can sign in (`feat/demo-tech-logins`)
+- **Changed:** the seed gives each technician a `@demo.vn` login (`tech.minh`, `tech.lan`,
+  `tech.khoa`, `tech.quan`, `tech.bao`, next to `tech.hung` and `tech.tam`), so every name on
+  screen belongs to a real account. Capacity and skills are unchanged.
+- **Upgrade notes:** the seed only runs on an empty database. Locally, delete `.data/pg-54330`
+  to re-seed. Production data is not touched; in production these accounts are created locked
+  unless listed in `SEED_ACCOUNT_PASSWORDS`.
+
 ### Three roles, the brief's main feature first (`feat/simplify-by-role`)
 - **Changed:** the web app has three roles, as the brief needs: the customer books, the
   technician carries out the job, the system manager sees everything. Advisor, dealership admin,
