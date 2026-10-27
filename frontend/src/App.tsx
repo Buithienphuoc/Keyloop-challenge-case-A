@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { Role } from './api/types';
 import { useAuth } from './auth/AuthContext';
@@ -45,6 +46,10 @@ function Only({ roles, children }: { roles: Role[]; children: React.ReactNode })
 export function App() {
   const { user, loading } = useAuth();
   const location = useLocation();
+  // After someone signs out, the next person to sign in starts on their own home page, not on
+  // the page the previous person was on.
+  const [signedInBefore, setSignedInBefore] = useState(false);
+  if (user && !signedInBefore) setSignedInBefore(true);
 
   if (loading) return <Loading what="Signing you in" />;
 
@@ -53,7 +58,7 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="*" element={<Navigate to="/login" replace state={{ from: location.pathname + location.search }} />} />
+        <Route path="*" element={<Navigate to="/login" replace state={signedInBefore ? undefined : { from: location.pathname + location.search }} />} />
       </Routes>
     );
   }

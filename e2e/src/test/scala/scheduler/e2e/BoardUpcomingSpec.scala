@@ -35,7 +35,7 @@ class BoardUpcomingSpec extends E2ESuite with CustomerSteps:
     it("sees the new booking under Coming up while the board still shows today") {
       val ref = needsBooking()
       ui.signIn("advisor.d1@demo.vn")
-      // Advisors land on their own appointments since #23; the board is one click away.
+      ui.waitForPath("/staff/advisor-appointments")
       ui.open("/staff/board")
       ui.eventually(s"$ref is listed under Coming up") { ui.visible(comingUp).getText.contains(ref) }
       ui.visible(By.cssSelector("input[aria-label='Date']")).getAttribute("value") should not be day.toString
