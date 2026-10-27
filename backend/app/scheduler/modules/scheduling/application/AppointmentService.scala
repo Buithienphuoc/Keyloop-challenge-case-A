@@ -8,6 +8,9 @@ import scheduler.modules.scheduling.domain.Lifecycle.TransitionError
 import scheduler.shared.{AppError, Db, DbSession, Log, Metrics}
 
 object AppointmentService:
+  /** How many bookings the board's "Coming up" list shows. */
+  val UpcomingLimit = 20
+
   /** How each lifecycle rule violation is reported. A new rule = one new entry (OCP). */
   private val TransitionErrors: Map[TransitionError, (AppointmentStatus, AppointmentStatus) => AppError] = Map(
     TransitionError.ROLE_NOT_ALLOWED -> ((_, to) => AppError.forbidden(s"Your role cannot set an appointment to $to")),
@@ -46,6 +49,20 @@ final class AppointmentService(
     val dealershipId = auth.requireDealership
     val (from, to) = LocalDay.bounds(date, workshop.dealership(dealershipId).timezone)
     db.run(reader.list(_, AppointmentFilter(dealershipId = Some(dealershipId), from = Some(from), to = Some(to))))
+
+  /**
+   * The dealership's next confirmed bookings from now on, soonest first, for the "Coming up" list
+   * on the advisor's board. The board shows one day at a time and customers can only book from
+   * a little ahead, so without this a new booking is easy to miss.
+   */
+  def listUpcoming(auth: AuthContext): Seq[AppointmentView] =
+    val filter = AppointmentFilter(
+      dealershipId = Some(auth.requireDealership),
+      from = Some(clock()),
+      statuses = Set(AppointmentStatus.CONFIRMED),
+      limit = AppointmentService.UpcomingLimit
+    )
+    db.run(reader.list(_, filter))
 
   /**
    * Every job of the admin's dealership, newest first, optionally in one status: what is new,
