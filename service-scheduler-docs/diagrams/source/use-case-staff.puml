@@ -3,81 +3,85 @@
 title Use cases — dealership and platform staff
 left to right direction
 
-actor "Service advisor\n(also covers Sales)" as Advisor
+actor "Service advisor\n(also covers Sales)" as Advisor <<off>>
 actor Technician as Tech
-actor "Dealership admin" as Admin
-actor "Workshop controller" as Controller
-actor "Parts staff" as Parts
+actor "Dealership admin" as Admin <<off>>
+actor "Workshop controller" as Controller <<off>>
+actor "Parts staff" as Parts <<off>>
 actor "System manager" as SysMgr
 
-Admin -|> Advisor
+Admin -[#B5BFBB]-|> Advisor
 
 rectangle "Unified Service Scheduler" {
   usecase "UC02 Sign in / sign out" as UC02
-  usecase "UC30 View the workshop day board" as UC30
-  usecase "UC31 Review an advice request\n(approve with duration, skill, bay type,\nestimate — or decline)" as UC31
-  usecase "UC32 Record start, finish, no-show" as UC32
-  usecase "UC33 Cancel a booking" as UC33
-  usecase "UC34 See the day's workload\nper bay and technician" as UC34
-  usecase "UC35 Move a job to another\nbay or technician" as UC35
-  usecase "UC36 See every job by status\nand record payment" as UC36
+  usecase "UC30 View the workshop day board" as UC30 <<off>>
+  usecase "UC31 Review an advice request\n(approve with duration, skill, bay type,\nestimate — or decline)" as UC31 <<off>>
+  usecase "UC32 Record start, finish, no-show" as UC32 <<off>>
+  usecase "UC33 Cancel a booking" as UC33 <<off>>
+  usecase "UC34 See the day's workload\nper bay and technician" as UC34 <<off>>
+  usecase "UC35 Move a job to another\nbay or technician" as UC35 <<off>>
+  usecase "UC36 See every job by status\nand record payment" as UC36 <<off>>
   usecase "UC40 View my jobs" as UC40
-  usecase "UC41 Start and finish a job" as UC41
-  usecase "UC42 Order parts for a job" as UC42
-  usecase "UC50 Manage service bays" as UC50
-  usecase "UC51 Manage technicians\n(skills, shifts, working days)" as UC51
-  usecase "UC52 Manage staff accounts" as UC52
-  usecase "UC53 Set opening hours\nand booking rules" as UC53
+  usecase "UC41 Start, finish and close a job\n(the customer has paid)" as UC41
+  usecase "UC42 Order parts for a job" as UC42 <<off>>
+  usecase "UC50 Manage service bays" as UC50 <<off>>
+  usecase "UC51 Manage technicians\n(skills, shifts, working days)" as UC51 <<off>>
+  usecase "UC52 Manage staff accounts" as UC52 <<off>>
+  usecase "UC53 Set opening hours\nand booking rules" as UC53 <<off>>
   usecase "UC60 Onboard a dealership\nwith its first admin" as UC60
   usecase "UC61 Monitor dealerships' capacity" as UC61
   usecase "UC62 Manage the service\npackage catalogue" as UC62
-  usecase "UC70 Manage parts stock" as UC70
-  usecase "UC71 Fulfil parts orders\n(order → receive → issue)" as UC71
+  usecase "UC63 See all data: appointments,\nbays, technicians, vehicles, people" as UC63
+  usecase "UC70 Manage parts stock" as UC70 <<off>>
+  usecase "UC71 Fulfil parts orders\n(order → receive → issue)" as UC71 <<off>>
 
   usecase "Book for a phone / walk-in customer" as F10 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
   usecase "Breaks and holidays in shifts" as F12 #F6F7F7;line.dashed;line:6F7D84;text:6F7D84
 }
 
-Advisor -- UC02
-Advisor -- UC30
-Advisor -- UC31
-Advisor -- UC32
-Advisor -- UC33
-Advisor -- UC34
-Advisor -- UC42
+Advisor -[#B5BFBB]- UC02
+Advisor -[#B5BFBB]- UC30
+Advisor -[#B5BFBB]- UC31
+Advisor -[#B5BFBB]- UC32
+Advisor -[#B5BFBB]- UC33
+Advisor -[#B5BFBB]- UC34
+Advisor -[#B5BFBB]- UC42
 Advisor .. F10
 Tech -- UC02
 Tech -- UC40
 Tech -- UC41
-Tech -- UC42
-Controller -- UC02
-Controller -- UC30
-Controller -- UC34
-Controller -- UC35
-Controller -- UC42
-Admin -- UC35
-Admin -- UC36
-Admin -- UC50
-Admin -- UC51
-Admin -- UC52
-Admin -- UC53
-Admin -- UC70
-Admin -- UC71
+Tech -[#B5BFBB]- UC42
+Controller -[#B5BFBB]- UC02
+Controller -[#B5BFBB]- UC30
+Controller -[#B5BFBB]- UC34
+Controller -[#B5BFBB]- UC35
+Controller -[#B5BFBB]- UC42
+Admin -[#B5BFBB]- UC35
+Admin -[#B5BFBB]- UC36
+Admin -[#B5BFBB]- UC50
+Admin -[#B5BFBB]- UC51
+Admin -[#B5BFBB]- UC52
+Admin -[#B5BFBB]- UC53
+Admin -[#B5BFBB]- UC70
+Admin -[#B5BFBB]- UC71
 Admin .. F12
-Parts -- UC02
-Parts -- UC42
-Parts -- UC70
-Parts -- UC71
+Parts -[#B5BFBB]- UC02
+Parts -[#B5BFBB]- UC42
+Parts -[#B5BFBB]- UC70
+Parts -[#B5BFBB]- UC71
 SysMgr -- UC02
 SysMgr -- UC60
 SysMgr -- UC61
 SysMgr -- UC62
+SysMgr -- UC63
 
 
-UC42 ..> UC71 : <<precedes>>
+UC42 .[#B5BFBB].> UC71 : <<precedes>>
 
 legend bottom right
-  Solid: implemented    Dashed grey: future work
+  Blue: in this version (customer, technician, system manager)
+  Solid grey: not in this version of the web app (the backend still has it)
+  Dashed grey: future work, not built
   The dealership admin can do everything a service advisor can.
   Moving a job and issuing parts are checked by database constraints
   (no overlap; stock never below zero).

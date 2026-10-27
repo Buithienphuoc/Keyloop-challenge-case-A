@@ -2,21 +2,27 @@
 !include _style.iuml
 title Appointment lifecycle (enforced in domain/Lifecycle.scala)
 hide empty description
+state NO_SHOW <<off>>
+skinparam state<<off>> {
+  BackgroundColor #EEF0F0
+  BorderColor #A7B0B4
+  FontColor #7D878C
+}
 
 [*] --> HELD : customer picks a time\n(POST /api/appointments/holds)
 [*] --> CONFIRMED : customer books directly\n(POST /api/appointments)
 HELD --> CONFIRMED : customer confirms before\nhold_expires_at (POST …/confirm)
 HELD --> CANCELLED : customer releases the hold
 HELD --> EXPIRED : hold ran out (system: booking flow,\njob move, confirm, or HoldSweeper)
-CONFIRMED --> IN_PROGRESS : advisor, admin or the\nassigned technician starts\n(any time, also before the booked start)
-IN_PROGRESS --> AWAITING_PAYMENT : advisor, admin or the\nassigned technician finishes\n(the customer has checked the vehicle)
-AWAITING_PAYMENT --> COMPLETED : dealership admin\nrecords the payment
-CONFIRMED --> CANCELLED : customer before the start time;\nadvisor / admin before work starts
-CONFIRMED --> NO_SHOW : advisor / admin,\nafter the start time
-CONFIRMED --> CONFIRMED : workshop controller / admin\nmoves the job (bay, technician)
+CONFIRMED --> IN_PROGRESS : the assigned technician starts\n(any time, also before the booked start)\n<color:#7D878C>advisor / admin: not in this version</color>
+IN_PROGRESS --> AWAITING_PAYMENT : the assigned technician finishes\n(the customer has checked the vehicle)\n<color:#7D878C>advisor / admin: not in this version</color>
+AWAITING_PAYMENT --> COMPLETED : the assigned technician\nrecords the payment\n<color:#7D878C>admin: not in this version</color>
+CONFIRMED --> CANCELLED : customer before the start time\n<color:#7D878C>advisor / admin before work starts:</color>\n<color:#7D878C>not in this version</color>
+CONFIRMED -[#B5BFBB]-> NO_SHOW : <color:#7D878C>advisor / admin, after the start time</color>\n<color:#7D878C>(not in this version)</color>
+CONFIRMED -[#B5BFBB]-> CONFIRMED : <color:#7D878C>workshop controller / admin moves</color>\n<color:#7D878C>the job (not in this version)</color>
 COMPLETED --> [*]
 CANCELLED --> [*]
-NO_SHOW --> [*]
+NO_SHOW -[#B5BFBB]-> [*]
 EXPIRED --> [*]
 
 note right of HELD
@@ -24,13 +30,14 @@ note right of HELD
   HELD, CONFIRMED and IN_PROGRESS take the bay,
   the technician and the vehicle: the database's
   EXCLUDE constraints apply to these three (V2).
-  Cancelling or expiring a consulted appointment
-  reopens its consultation request (BOOKED → APPROVED).
 end note
 
 note right of AWAITING_PAYMENT
   The work is done: the bay, technician and
-  vehicle are free again (V3). The admin sees
-  every job by status in "Jobs & payments".
+  vehicle are free again (V3). The technician
+  closes the job once the customer has paid.
 end note
+legend bottom right
+  Grey: not in this version of the web app (the backend still has it)
+endlegend
 @enduml

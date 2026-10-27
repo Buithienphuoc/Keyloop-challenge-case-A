@@ -7,12 +7,12 @@ digraph context {
 
   node [shape=box, style=filled, fillcolor="#F3F5F4", width=1.9, height=0.8];
   customer   [label="Customer"];
-  advisor    [label="Service advisor"];
+  advisor    [label="Service advisor", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
   technician [label="Technician"];
-  admin      [label="Dealership admin"];
+  admin      [label="Dealership admin", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
   sysmgr     [label="System manager"];
-  controller [label="Workshop controller"];
-  partsStaff [label="Parts staff"];
+  controller [label="Workshop controller", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
+  partsStaff [label="Parts staff", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
   monitor    [label="Monitoring platform\n(Prometheus, Jaeger, log store)"];
 
   system [shape=circle, style=filled, fillcolor="#1D4E89", fontcolor=white, fontsize=15, width=2.6, fixedsize=true,
@@ -25,22 +25,27 @@ digraph context {
   system -> customer [label="session token, packages and checklists,\nfree slots, hold with expiry, confirmation\nor 3 alternatives,\nadvice decision, appointment status"];
 
   sysmgr -> system [label="new dealership (hours, zone, grid),\nfirst admin account, service packages"];
-  system -> sysmgr [label="dealership list with capacity,\npackage catalogue"];
+  system -> sysmgr [label="dealership list with capacity,\npackage catalogue, all data\n(appointments, bays, technicians,\nvehicles, people)"];
 
-  system -> advisor [label="day board (bays x hours),\nadvice request queue"];
-  advisor -> system [label="advice decision (duration, skill,\nbay type, estimate), start / done /\nno-show / cancel, parts order"];
+  system -> advisor [label="day board (bays x hours),\nadvice request queue", color="#B5BFBB", fontcolor="#7D878C"];
+  advisor -> system [label="advice decision (duration, skill,\nbay type, estimate), start / done /\nno-show / cancel, parts order", color="#B5BFBB", fontcolor="#7D878C"];
 
   system -> technician [label="today's assigned jobs"];
-  technician -> system [label="job started, job finished,\nparts order"];
+  technician -> system [label="job started, finished,\nclosed once paid"];
 
-  system -> controller [label="workload per bay and technician"];
-  controller -> system [label="job moves (bay, technician, reason)"];
+  system -> controller [label="workload per bay and technician", color="#B5BFBB", fontcolor="#7D878C"];
+  controller -> system [label="job moves (bay, technician, reason)", color="#B5BFBB", fontcolor="#7D878C"];
 
-  system -> partsStaff [label="stock levels, parts orders"];
-  partsStaff -> system [label="stock changes, order → receive → issue"];
+  system -> partsStaff [label="stock levels, parts orders", color="#B5BFBB", fontcolor="#7D878C"];
+  partsStaff -> system [label="stock changes, order → receive → issue", color="#B5BFBB", fontcolor="#7D878C"];
 
-  admin -> system [label="service bays, technicians\n(skills, shifts, days), staff accounts,\nopening hours and booking rules"];
-  system -> admin [label="resource lists"];
+  admin -> system [label="service bays, technicians\n(skills, shifts, days), staff accounts,\nopening hours and booking rules", color="#B5BFBB", fontcolor="#7D878C"];
+  system -> admin [label="resource lists", color="#B5BFBB", fontcolor="#7D878C"];
 
   system -> monitor [label="JSON log lines (requestId, traceId),\n/metrics, /health, OTLP traces"];
+
+  legend [shape=plaintext, style="", fixedsize=false, width=0, height=0, fontsize=11, fontcolor="#1F2A30", label=<<table border="1" cellborder="0" cellpadding="4" color="#B5BFBB">
+    <tr><td bgcolor="#1D4E89" width="14">  </td><td align="left">In this version: customer, technician, system manager</td></tr>
+    <tr><td bgcolor="#EEF0F0" border="1" width="14">  </td><td align="left"><font color="#7D878C">Grey: not in this version of the web app (the backend still has it)</font></td></tr>
+  </table>>];
 }

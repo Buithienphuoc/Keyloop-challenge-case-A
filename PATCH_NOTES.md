@@ -13,6 +13,13 @@ Entry format:
 
 ## Unreleased
 
+### Diagrams: what is not in this version is grey, not gone (`docs/grey-not-in-version`)
+- **Docs:** use case, activity, state and data flow diagrams keep every role and flow; what is not
+  in this version of the web app (service advisor, dealership admin, workshop controller, parts
+  staff, the consult-first flow) is drawn solid grey, with a legend. Dashed grey stays future
+  work. The README and `docs/e2e-traceability.md` list those features again under "Not in this
+  version". `service-scheduler-docs/diagrams` is kept in step.
+
 ### Every demo technician can sign in (`feat/demo-tech-logins`)
 - **Changed:** the seed gives each technician a `@demo.vn` login (`tech.minh`, `tech.lan`,
   `tech.khoa`, `tech.quan`, `tech.bao`, next to `tech.hung` and `tech.tam`), so every name on

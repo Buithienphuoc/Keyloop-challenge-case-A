@@ -364,7 +364,9 @@ PostgreSQL. `AppLoader` is the only place that decides which adapter implements 
 ## 9. Diagrams
 
 All diagrams are in the `diagrams` folder as PNG and SVG, with their PlantUML (`.puml`) or
-Graphviz (`.dot`) sources. Solid shapes are built; dashed grey shapes are future work.
+Graphviz (`.dot`) sources. Blue shapes are in this version (customer, technician, system manager);
+solid grey shapes were built but are not in this version of the web app (the backend still has
+them); dashed grey shapes are future work.
 
 | # | Diagram | File | Shows |
 | --- | --- | --- | --- |
