@@ -5,7 +5,7 @@ import play.api.libs.json.*
 
 import scheduler.modules.catalog.{CatalogReader, InspectionAreas}
 import scheduler.modules.consultation.*
-import scheduler.modules.identity.{AuthContext, assertCanSee, assertSameDealership, requireDealership}
+import scheduler.modules.identity.{AuthContext, Role, assertCanSee, assertSameDealership, listScope}
 import scheduler.modules.scheduling.application.ConsultationBookingPort
 import scheduler.modules.scheduling.domain.Compatibility
 import scheduler.modules.vehicles.OwnedVehicles
@@ -78,13 +78,14 @@ final class ConsultationService(db: Db, repo: ConsultationRepository, vehicles: 
 
   def listMine(auth: AuthContext): Seq[ConsultationView] = repo.listByCustomer(auth.userId)
 
-  def listForDealership(auth: AuthContext, status: Option[ConsultationStatus]): Seq[ConsultationView] =
-    repo.listByDealership(auth.requireDealership, status)
+  /** The caller's dealership by default; any dealership, or all of them, for the roles that see every workshop. */
+  def listForDealership(auth: AuthContext, status: Option[ConsultationStatus], dealershipId: Option[String] = None): Seq[ConsultationView] =
+    repo.listByDealership(listScope(auth, dealershipId), status)
 
   def review(auth: AuthContext, id: String, input: Review, log: Log): ConsultationView =
     db.tx { s =>
       val c = repo.lockForReview(s, id).getOrElse(throw AppError.notFound("Consultation request"))
-      assertSameDealership(auth, c.dealershipId)
+      if !Role.AllWorkshopRoles.contains(auth.role) then assertSameDealership(auth, c.dealershipId)
       if c.status != ConsultationStatus.SUBMITTED then
         throw AppError.conflict("ALREADY_REVIEWED", s"This request is already ${c.status.toString.toLowerCase}")
 

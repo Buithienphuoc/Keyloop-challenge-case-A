@@ -5,7 +5,7 @@ import java.time.{LocalTime, ZoneId}
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 
-import scheduler.modules.identity.Role
+import scheduler.modules.identity.{Role, StaffMember}
 import scheduler.modules.identity.application.{CreateUser, IdentityRequests, UserAccounts}
 import scheduler.modules.system.*
 import scheduler.shared.{AppError, Db, Log, Validate}
@@ -55,6 +55,10 @@ final case class Onboarded(dealershipId: String, adminUserId: String)
 final class TenantService(db: Db, tenants: TenantRepository, identity: UserAccounts):
 
   def list(): Seq[DealershipSummary] = tenants.listWithCapacity()
+
+  /** Customers, advisors, technicians and admins of every dealership; `role` narrows it to one of them. */
+  def listPeople(role: Option[Role]): Seq[StaffMember] =
+    identity.listByRoles(role.fold(Role.ListableBySystem)(Set(_)))
 
   /** The dealership and its first admin are created together or not at all. */
   def onboard(input: NewDealership, log: Log): Onboarded =

@@ -68,9 +68,9 @@ class SchedulingSupportSpec extends AnyFunSpec with Matchers:
       (the[AppError] thrownBy context(consultation(customerId = "other")).requirementFor(Session, customer, "d1", byRequest)).status shouldBe 404
     }
 
-    it("keeps staff to their own dealership's consultations") {
-      val advisor = auth(Role.SERVICE_ADVISOR, dealershipId = Some("d2"))
-      (the[AppError] thrownBy context().requirementFor(Session, advisor, "d1", byRequest)).status shouldBe 403
+    it("keeps staff outside the every-workshop roles to their own dealership's consultations") {
+      val controller = auth(Role.WORKSHOP_CONTROLLER, dealershipId = Some("d2"))
+      (the[AppError] thrownBy context().requirementFor(Session, controller, "d1", byRequest)).status shouldBe 403
     }
 
     it("refuses a consultation reviewed by another dealership or for another vehicle") {

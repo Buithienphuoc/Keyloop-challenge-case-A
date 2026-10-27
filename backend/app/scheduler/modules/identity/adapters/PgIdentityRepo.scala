@@ -59,6 +59,14 @@ final class PgIdentityRepo(db: Db) extends UserRepository, SessionRepository:
       .map { case user ~ active => StaffMember(user, active) }
   }
 
+  def listByRoles(roles: Set[Role]): Seq[StaffMember] = db.run { s =>
+    given java.sql.Connection = Sql.connection(s)
+    SQL(s"$UserSelect WHERE u.role = ANY({roles}) ORDER BY u.role, u.full_name")
+      .on("roles" -> textArray(roles.toSeq.map(_.toString)))
+      .as((publicUser ~ Sql.rows(_.bool("is_active"))).*)
+      .map { case user ~ active => StaffMember(user, active) }
+  }
+
   def create(userId: String, tokenHash: String, expiresAt: Instant): Unit = db.run { s =>
     given java.sql.Connection = Sql.connection(s)
     SQL"INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($tokenHash, $userId::uuid, ${ts(expiresAt)})".executeUpdate()

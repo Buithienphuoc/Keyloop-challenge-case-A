@@ -36,17 +36,17 @@ class AppointmentServiceSpec extends AnyFunSpec with Matchers:
       statusOf(f.service.get(customer, "a1")) shouldBe 404
     }
 
-    it("shows staff only appointments of their own dealership") {
+    it("shows advisors, technicians and admins appointments of every dealership; other staff only their own") {
       val f = Fixture(locked(CONFIRMED, dealershipId = "d2"))
-      statusOf(f.service.get(auth(Role.SERVICE_ADVISOR), "a1")) shouldBe 403
+      for role <- Seq(Role.SERVICE_ADVISOR, Role.TECHNICIAN, Role.ADMIN) do f.service.get(auth(role), "a1").id shouldBe "a1"
       f.service.get(auth(Role.SYSTEM_MANAGER, dealershipId = None), "a1").id shouldBe "a1"
+      statusOf(f.service.get(auth(Role.WORKSHOP_CONTROLLER), "a1")) shouldBe 403
+      statusOf(f.service.get(auth(Role.PARTS_STAFF), "a1")) shouldBe 403
     }
 
-    it("shows a technician only the jobs assigned to them") {
+    it("shows a technician jobs assigned to someone else too") {
       val f = Fixture(locked(CONFIRMED, technicianId = "t2"))
-      statusOf(f.service.get(auth(Role.TECHNICIAN, userId = "tu1"), "a1")) shouldBe 404
-      val mine = Fixture(locked(CONFIRMED))
-      mine.service.get(auth(Role.TECHNICIAN, userId = "tu1"), "a1").id shouldBe "a1"
+      f.service.get(auth(Role.TECHNICIAN, userId = "tu1"), "a1").id shouldBe "a1"
     }
 
     it("answers 404 for an unknown id") {
@@ -92,6 +92,19 @@ class AppointmentServiceSpec extends AnyFunSpec with Matchers:
       statusOf(f.service.listUpcoming(auth(Role.SYSTEM_MANAGER, dealershipId = None))) shouldBe 403
     }
 
+    it("lists every appointment for advisors, technicians and admins: own dealership by default, another or all on request") {
+      val f = Fixture(locked(CONFIRMED))
+      for role <- Seq(Role.SERVICE_ADVISOR, Role.TECHNICIAN, Role.ADMIN) do
+        f.service.listAll(auth(role), None, None)
+        f.store.lastFilter shouldBe Some(AppointmentFilter(dealershipId = Some("d1"), statuses = AppointmentStatus.values.toSet - HELD, newestFirst = true))
+        f.service.listAll(auth(role), Some("all"), Some(CONFIRMED))
+        f.store.lastFilter shouldBe Some(AppointmentFilter(dealershipId = None, statuses = Set(CONFIRMED), newestFirst = true))
+        f.service.listAll(auth(role), Some("d2"), None)
+        f.store.lastFilter.get.dealershipId shouldBe Some("d2")
+      statusOf(f.service.listAll(auth(Role.WORKSHOP_CONTROLLER), Some("all"), None)) shouldBe 403
+      statusOf(f.service.listAll(auth(Role.WORKSHOP_CONTROLLER), Some("d2"), None)) shouldBe 403
+    }
+
     it("lists the admin's dealership jobs newest first, in one status or in all but HELD") {
       val f = Fixture(locked(CONFIRMED))
       f.service.listDealershipJobs(auth(Role.ADMIN), Some(AWAITING_PAYMENT))
@@ -123,16 +136,19 @@ class AppointmentServiceSpec extends AnyFunSpec with Matchers:
       f.store.statusChanges shouldBe empty
     }
 
-    it("keeps staff to their own dealership") {
-      val f = Fixture(locked(CONFIRMED, dealershipId = "d2"))
-      statusOf(f.service.changeStatus(auth(Role.SERVICE_ADVISOR), "a1", CANCELLED, None, Log.silent)) shouldBe 403
+    it("lets advisors, technicians and admins move appointments of another dealership") {
+      Fixture(locked(CONFIRMED, dealershipId = "d2")).service
+        .changeStatus(auth(Role.SERVICE_ADVISOR), "a1", CANCELLED, None, Log.silent).status shouldBe CANCELLED
+      Fixture(locked(CONFIRMED, dealershipId = "d2")).service
+        .changeStatus(auth(Role.TECHNICIAN, userId = "tu1"), "a1", IN_PROGRESS, None, Log.silent).status shouldBe IN_PROGRESS
+      Fixture(locked(AWAITING_PAYMENT, dealershipId = "d2")).service
+        .changeStatus(auth(Role.ADMIN), "a1", COMPLETED, None, Log.silent).status shouldBe COMPLETED
     }
 
-    it("lets a technician start only their own job") {
+    it("lets a technician start a job assigned to another technician, within the lifecycle rules") {
       val other = Fixture(locked(CONFIRMED, technicianId = "t2"))
-      statusOf(other.service.changeStatus(auth(Role.TECHNICIAN, userId = "tu1"), "a1", IN_PROGRESS, None, Log.silent)) shouldBe 403
-      val mine = Fixture(locked(CONFIRMED))
-      mine.service.changeStatus(auth(Role.TECHNICIAN, userId = "tu1"), "a1", IN_PROGRESS, None, Log.silent).status shouldBe IN_PROGRESS
+      other.service.changeStatus(auth(Role.TECHNICIAN, userId = "tu1"), "a1", IN_PROGRESS, None, Log.silent).status shouldBe IN_PROGRESS
+      statusOf(Fixture(locked(CONFIRMED)).service.changeStatus(auth(Role.TECHNICIAN, userId = "tu1"), "a1", CANCELLED, None, Log.silent)) shouldBe 403
     }
 
     it("maps every lifecycle rule to its API error") {

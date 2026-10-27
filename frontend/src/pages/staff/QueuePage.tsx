@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { get, post } from '../../api/client';
 import { useReferenceData } from '../../api/hooks';
 import type { Consultation, ConsultationStatus } from '../../api/types';
+import { useAuth } from '../../auth/AuthContext';
 import { Empty, ErrorNote, Loading, PageHead, Plate, RequestPill } from '../../components/ui';
+import { WorkshopFilter, scopeQuery, type WorkshopScope } from '../../components/WorkshopFilter';
 import { dt, duration, money, stamp, time, vehicleName } from '../../lib/format';
 
 const TABS: { id: ConsultationStatus | 'ALL'; label: string }[] = [
@@ -14,10 +16,12 @@ const TABS: { id: ConsultationStatus | 'ALL'; label: string }[] = [
 ];
 
 export function QueuePage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('SUBMITTED');
+  const [scope, setScope] = useState<WorkshopScope>('');
   const all = useQuery({
-    queryKey: ['staff', 'consultations'],
-    queryFn: () => get<Consultation[]>('/api/staff/consultations'),
+    queryKey: ['staff', 'consultations', scope],
+    queryFn: () => get<Consultation[]>(`/api/staff/consultations?${scopeQuery(scope)}`),
     refetchInterval: 60_000,
   });
   const shown = (all.data ?? []).filter((c) => tab === 'ALL' || c.status === tab);
@@ -25,7 +29,7 @@ export function QueuePage() {
 
   return (
     <div className="page page-narrow">
-      <PageHead title="Advice requests">
+      <PageHead title="Advice requests" actions={<WorkshopFilter value={scope} ownId={user?.dealershipId} onChange={setScope} />}>
         Customers describe a problem or a customisation. Turn each one into a job the workshop can schedule: how long, which skill, which bay.
       </PageHead>
       <div className="tabs" role="tablist">
@@ -63,7 +67,7 @@ function RequestCard({ c }: { c: Consultation }) {
         <Plate text={c.vehicle.plate} />
       </div>
       <p className="small muted">
-        {c.customer.fullName}
+        {c.dealership.name} · {c.customer.fullName}
         {c.customer.phone ? ` · ${c.customer.phone}` : ''} · {vehicleName(c.vehicle)} ({c.vehicle.vehicleType === 'CAR' ? 'car' : 'motorbike'}) · sent{' '}
         {stamp(c.createdAt)}
       </p>

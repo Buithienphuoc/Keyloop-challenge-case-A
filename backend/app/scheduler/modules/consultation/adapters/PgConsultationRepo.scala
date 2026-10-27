@@ -66,9 +66,9 @@ final class PgConsultationRepo(db: Db) extends ConsultationRepository:
     SQL(s"$ViewSelect WHERE c.customer_id = {customerId}::uuid ORDER BY c.created_at DESC").on("customerId" -> customerId).as(view.*)
   }
 
-  def listByDealership(dealershipId: String, status: Option[ConsultationStatus]): Seq[ConsultationView] = db.run { s =>
+  def listByDealership(dealershipId: Option[String], status: Option[ConsultationStatus]): Seq[ConsultationView] = db.run { s =>
     given java.sql.Connection = Sql.connection(s)
-    SQL(s"""$ViewSelect WHERE c.dealership_id = {dealershipId}::uuid AND (CAST({status} AS text) IS NULL OR c.status = CAST({status} AS text))
+    SQL(s"""$ViewSelect WHERE (CAST({dealershipId} AS uuid) IS NULL OR c.dealership_id = CAST({dealershipId} AS uuid)) AND (CAST({status} AS text) IS NULL OR c.status = CAST({status} AS text))
             ORDER BY (c.status = 'SUBMITTED') DESC, c.created_at""")
       .on("dealershipId" -> dealershipId, "status" -> status.map(_.toString))
       .as(view.*)

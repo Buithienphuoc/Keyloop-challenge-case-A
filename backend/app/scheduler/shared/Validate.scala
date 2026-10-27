@@ -41,6 +41,10 @@ object Validate:
   val uuid: Reads[String] =
     Reads.StringReads.filter(error("Must be a UUID"))(s => s.length == 36 && Try(UUID.fromString(s)).isSuccess).map(_.toLowerCase)
 
+  /** A `dealershipId` filter: one dealership's id, or "all" for every dealership. */
+  val dealershipScope: Reads[String] =
+    Reads.StringReads.flatMapResult(s => if s == "all" then JsSuccess(s) else uuid.reads(JsString(s)))
+
   val isoDate: Reads[LocalDate] = Reads.StringReads.flatMapResult { s =>
     if """\d{4}-\d{2}-\d{2}""".r.matches(s) then
       Try(LocalDate.parse(s)).fold(_ => JsError(error("Not a valid date")), JsSuccess(_))

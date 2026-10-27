@@ -15,7 +15,9 @@ import { VehiclesPage } from './pages/customer/VehiclesPage';
 import { BoardPage } from './pages/staff/BoardPage';
 import { JobsPage } from './pages/staff/JobsPage';
 import { QueuePage } from './pages/staff/QueuePage';
+import { AllAppointmentsPage } from './pages/staff/AllAppointmentsPage';
 import { DealershipsPage } from './pages/system/DealershipsPage';
+import { PeoplePage } from './pages/system/PeoplePage';
 import { PackagesPage } from './pages/system/PackagesPage';
 import { PartsPage } from './pages/parts/PartsPage';
 import { WorkloadPage } from './pages/staff/WorkloadPage';
@@ -64,11 +66,13 @@ export function App() {
         <Route path="/staff/board" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER']}><BoardPage /></Only>} />
         <Route path="/staff/workload" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER']}><WorkloadPage /></Only>} />
         <Route path="/parts" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER', 'PARTS_STAFF', 'TECHNICIAN']}><PartsPage /></Only>} />
-        <Route path="/staff/requests" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN']}><QueuePage /></Only>} />
+        <Route path="/staff/requests" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'TECHNICIAN']}><QueuePage /></Only>} />
+        <Route path="/staff/appointments" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'TECHNICIAN']}><AllAppointmentsPage /></Only>} />
         <Route path="/admin" element={<Only roles={['ADMIN']}><ResourcesPage /></Only>} />
         <Route path="/admin/jobs" element={<Only roles={['ADMIN']}><JobsOverviewPage /></Only>} />
         <Route path="/jobs" element={<Only roles={['TECHNICIAN']}><JobsPage /></Only>} />
         <Route path="/system" element={<Only roles={['SYSTEM_MANAGER']}><DealershipsPage /></Only>} />
+        <Route path="/system/people" element={<Only roles={['SYSTEM_MANAGER']}><PeoplePage /></Only>} />
         <Route path="/system/packages" element={<Only roles={['SYSTEM_MANAGER']}><PackagesPage /></Only>} />
       </Route>
       <Route path="/login" element={<Navigate to={(location.state as { from?: string } | null)?.from ?? HOME[user.role]} replace />} />

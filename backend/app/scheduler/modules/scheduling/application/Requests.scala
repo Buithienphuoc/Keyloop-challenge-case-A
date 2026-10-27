@@ -64,7 +64,17 @@ final case class JobsQuery(status: Option[AppointmentStatus])
 
 object JobsQuery:
   private val listable = AppointmentStatus.values.filterNot(s => s == AppointmentStatus.HELD || s == AppointmentStatus.EXPIRED)
-  given Reads[JobsQuery] = (__ \ "status").readNullable(Validate.oneOf(listable)).map(JobsQuery.apply)
+  val listableStatus: Reads[AppointmentStatus] = Validate.oneOf(listable)
+  given Reads[JobsQuery] = (__ \ "status").readNullable(listableStatus).map(JobsQuery.apply)
+
+/** Every appointment, optionally of one dealership ("all" = every one) and in one status. */
+final case class AllAppointmentsQuery(dealershipId: Option[String], status: Option[AppointmentStatus])
+
+object AllAppointmentsQuery:
+  given Reads[AllAppointmentsQuery] = (
+    (__ \ "dealershipId").readNullable(Validate.dealershipScope) and
+      (__ \ "status").readNullable(JobsQuery.listableStatus)
+  )(AllAppointmentsQuery.apply)
 
 final case class StatusChange(status: AppointmentStatus, reason: Option[String])
 

@@ -391,6 +391,17 @@ paths:
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Availability' } } } }
   /api/appointments:
+    get:
+      tags: [Staff]
+      summary: Every appointment, newest first (advisor, technician, admin); holds being confirmed are left out
+      description: |
+        Advisors, technicians and admins read the appointments of every dealership. Without
+        `dealershipId` the list is the caller's own dealership; pass another dealership's id, or `all`.
+      parameters:
+        - { name: dealershipId, in: query, required: false, schema: { type: string, description: 'A dealership id, or "all"' } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [CONFIRMED, IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW] } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Appointment' } } } } }
     post:
       tags: [Booking]
       summary: Book an appointment
@@ -541,7 +552,7 @@ paths:
   /api/consultations/{id}/review:
     post:
       tags: [Consultations]
-      summary: Advisor approves (with duration, skill, bay type, estimate) or rejects a request
+      summary: An advisor, technician or admin (of any dealership) approves (with duration, skill, bay type, estimate) or rejects a request
       parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody:
         required: true
@@ -568,9 +579,10 @@ paths:
   /api/staff/consultations:
     get:
       tags: [Staff]
-      summary: Consultation queue for my dealership
+      summary: Consultation queue (advisor, technician, admin); my dealership unless `dealershipId` says another one or `all`
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [SUBMITTED, APPROVED, REJECTED, BOOKED, CANCELLED] } }
+        - { name: dealershipId, in: query, required: false, schema: { type: string, description: 'A dealership id, or "all"' } }
       responses:
         '200': { description: OK }
   /api/staff/appointments:
@@ -691,6 +703,14 @@ paths:
       tags: [System]
       summary: Onboard a dealership together with its first admin
       responses: { '201': { description: Created } }
+  /api/system/users:
+    get:
+      tags: [System]
+      summary: Customers, advisors, technicians and admins of every dealership, by role then name
+      parameters:
+        - { name: role, in: query, required: false, schema: { type: string, enum: [CUSTOMER, SERVICE_ADVISOR, TECHNICIAN, ADMIN] } }
+      responses:
+        '200': { description: OK }
   /api/system/packages:
     get:
       tags: [System]
