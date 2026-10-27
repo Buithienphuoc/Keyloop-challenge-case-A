@@ -63,7 +63,7 @@ final case class NewAppointment(
     createdBy: String,
     status: AppointmentStatus = AppointmentStatus.CONFIRMED,
     holdExpiresAt: Option[Instant] = None,
-    /** Customer bookings start open (false); staff-made or migrated jobs may already be assigned. */
+    /** Customer bookings are assigned to the technician they reserve; seeded demo jobs may start open (false). */
     technicianAssigned: Boolean = false
 )
 

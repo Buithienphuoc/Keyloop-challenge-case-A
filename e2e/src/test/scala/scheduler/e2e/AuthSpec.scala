@@ -28,10 +28,10 @@ class AuthSpec extends E2ESuite:
       ui.path shouldBe "/"
     }
 
-    it("sends a customer who opens a staff page back to their own home") {
-      ui.open("/staff/board")
+    it("sends a customer who opens a system page back to their own home") {
+      ui.open("/system/data")
       ui.waitForPath("/")
-      ui.notSee("Workshop day") shouldBe true
+      ui.notSee("All data") shouldBe true
     }
 
     it("signs out, after which pages need a new sign-in") {
@@ -42,12 +42,11 @@ class AuthSpec extends E2ESuite:
   }
 
   describe("Each role lands on its own start page") {
+    // Advisors, admins and other staff accounts stay in the database but have no pages.
     val starts = Seq(
-      "advisor.d1@demo.vn" -> "/staff/advisor-appointments",
-      "tech.hung@demo.vn" -> "/services/open",
-      "controller.d1@demo.vn" -> "/staff/board",
-      "parts.d1@demo.vn" -> "/parts",
-      "sysadmin@demo.vn" -> "/system"
+      "tech.hung@demo.vn" -> "/jobs",
+      "sysadmin@demo.vn" -> "/system",
+      "advisor.d1@demo.vn" -> "/not-used"
     )
     for (email, start) <- starts do
       it(s"$email starts at $start") {

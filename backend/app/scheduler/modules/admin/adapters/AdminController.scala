@@ -9,13 +9,16 @@ import scheduler.modules.admin.application.AdminRequests.{*, given}
 import scheduler.modules.admin.application.WorkshopAdminService
 import scheduler.modules.identity.IdentityJson.given
 import scheduler.modules.identity.Role.*
+import scheduler.shared.Validate
 
 /** HTTP adapter for dealership administration. No SQL here. */
 final class AdminController(cc: ControllerComponents, guard: Guard, admin: WorkshopAdminService) extends ApiController(cc):
   private val onlyAdmin = guard(ADMIN)
   private val ok = Json.obj("ok" -> true)
+  private val readers = guard(ADMIN, SYSTEM_MANAGER)
+  private val dealership: Reads[Option[String]] = (__ \ "dealershipId").readNullable(Validate.uuid)
 
-  def listBays: Action[AnyContent] = onlyAdmin.async(req => json()(admin.listBays(req.auth)))
+  def listBays: Action[AnyContent] = readers.async(req => json()(admin.listBays(req.auth, query[Option[String]](req)(using dealership))))
 
   def addBay: Action[AnyContent] = onlyAdmin.async(req => json(Created)(admin.addBay(req.auth, body[NewBay](req), req.log)))
 
@@ -26,7 +29,7 @@ final class AdminController(cc: ControllerComponents, guard: Guard, admin: Works
     }
   }
 
-  def listTechnicians: Action[AnyContent] = onlyAdmin.async(req => json()(admin.listTechnicians(req.auth)))
+  def listTechnicians: Action[AnyContent] = readers.async(req => json()(admin.listTechnicians(req.auth, query[Option[String]](req)(using dealership))))
 
   def addTechnician: Action[AnyContent] = onlyAdmin.async { req =>
     json(Created)(Json.obj("id" -> admin.addTechnician(req.auth, body[NewTechnician](req), req.log)))

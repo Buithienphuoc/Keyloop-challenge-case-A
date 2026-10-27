@@ -54,9 +54,15 @@ object NewVehicle:
       (__ \ "mileageKm").readNullable(Validate.int(0, 2_000_000))
   )(NewVehicle.apply)
 
+/** A vehicle with the customer who owns it, for the system manager. */
+final case class OwnedVehicle(vehicle: Vehicle, ownerName: String, ownerEmail: String)
+
 /** Port: vehicle persistence. */
 trait VehicleRepository:
   def listByOwner(ownerId: String): Seq[Vehicle]
+
+  /** Every vehicle of every customer, newest first. */
+  def listAll(): Seq[OwnedVehicle]
 
   /** The vehicle only if it belongs to this owner; None otherwise (never leaks other people's vehicles). */
   def findOwned(ownerId: String, vehicleId: String): Option[Vehicle]

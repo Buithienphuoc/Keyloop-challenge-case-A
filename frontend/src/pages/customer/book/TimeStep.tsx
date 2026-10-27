@@ -105,7 +105,7 @@ export function TimeStep(props: Props) {
             Back
           </button>
         ) : (
-          <Link className="btn" to="/requests">
+          <Link className="btn" to="/appointments">
             Back
           </Link>
         )}

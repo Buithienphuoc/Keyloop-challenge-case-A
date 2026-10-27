@@ -256,7 +256,6 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       move("IN_PROGRESS").str("status") shouldBe "IN_PROGRESS"
       move("COMPLETED").errorCode shouldBe "INVALID_STATUS_TRANSITION" // payment comes first
       move("AWAITING_PAYMENT").str("status") shouldBe "AWAITING_PAYMENT"
-      move("COMPLETED").status shouldBe 403 // only the dealership admin takes the payment
       move("IN_PROGRESS").status shouldBe 409
 
       get("/api/admin/jobs?status=AWAITING_PAYMENT", adminD1).ids should contain(appointmentId)
@@ -264,7 +263,9 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       get("/api/admin/jobs", advisorD1).status shouldBe 403
       get("/api/admin/jobs?status=HELD", adminD1).status shouldBe 400
 
-      val paid = post(s"/api/appointments/$appointmentId/status", adminD1, Json.obj("status" -> "COMPLETED", "reason" -> "Paid at the desk"))
+      post(s"/api/appointments/$appointmentId/status", advisorD1, Json.obj("status" -> "COMPLETED")).status shouldBe 403
+      // The technician closes the job once the customer has paid.
+      val paid = post(s"/api/appointments/$appointmentId/status", techHung, Json.obj("status" -> "COMPLETED", "reason" -> "Paid at the desk"))
       paid.str("status") shouldBe "COMPLETED"
       get("/api/me/appointments", customer).json.as[Seq[JsObject]].find(o => (o \ "id").as[String] == appointmentId)
         .map(o => (o \ "status").as[String]) shouldBe Some("COMPLETED")
@@ -384,6 +385,28 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       (hcm \ "activeBays").as[Int] shouldBe 4
       (hcm \ "activeTechnicians").as[Int] should be >= 4
       (hcm \ "upcomingAppointments").as[Int] should be > 0
+    }
+
+    it("lets the system manager read every appointment, bay, technician and vehicle, and change none of them") {
+      val all = get("/api/appointments", sys)
+      all.status shouldBe 200
+      val appointments = all.json.as[Seq[JsObject]]
+      appointments should not be empty
+      appointments.map(a => (a \ "dealership" \ "id").as[String]).toSet should contain(d1)
+      get("/api/appointments?dealershipId=all", sys).ids.toSet shouldBe all.ids.toSet
+
+      get(s"/api/admin/bays?dealershipId=$d1", sys).json.as[Seq[JsObject]].map(b => (b \ "name").as[String]) should contain("Stand A")
+      get(s"/api/admin/technicians?dealershipId=$td", sys).json.as[Seq[JsObject]].map(t => (t \ "displayName").as[String]) should contain(
+        "Võ Thanh Tâm")
+      get("/api/admin/bays", sys).errorCode shouldBe "DEALERSHIP_REQUIRED"
+
+      val vehicles = get("/api/system/vehicles", sys).json.as[Seq[JsObject]]
+      vehicles.find(v => (v \ "plate").as[String] == "59-X1 234.56").map(v => (v \ "ownerEmail").as[String]) shouldBe Some("customer@demo.vn")
+      get("/api/system/vehicles", customer).status shouldBe 403
+      get("/api/system/vehicles", adminD1).status shouldBe 403
+
+      val confirmed = appointments.find(a => (a \ "status").as[String] == "CONFIRMED").get
+      post(s"/api/appointments/${(confirmed \ "id").as[String]}/status", sys, Json.obj("status" -> "IN_PROGRESS")).status shouldBe 403
     }
   }
 

@@ -16,7 +16,7 @@ import scheduler.modules.scheduling.domain.VehicleType
 import scheduler.modules.system.*
 import scheduler.modules.system.application.{NewAdmin, NewDealership, PackageAdminService, TenantService}
 import scheduler.modules.system.application.PackageRequests.NewPackage
-import scheduler.modules.vehicles.{NewVehicle, Vehicle, VehicleRepository}
+import scheduler.modules.vehicles.{NewVehicle, OwnedVehicle, Vehicle, VehicleRepository}
 import scheduler.modules.vehicles.application.VehicleService
 import scheduler.shared.{AppError, DbSession, Log}
 import scheduler.support.Fakes.*
@@ -118,7 +118,13 @@ class AdminServicesSpec extends AnyFunSpec with Matchers:
     }
 
     it("needs an account attached to a dealership") {
-      (the[AppError] thrownBy Fixture().service.listBays(auth(Role.SYSTEM_MANAGER, dealershipId = None))).status shouldBe 403
+      (the[AppError] thrownBy Fixture().service.listBays(auth(Role.ADMIN, dealershipId = None))).status shouldBe 403
+    }
+
+    it("lets the system manager read the bays of a dealership it names, and only one it names") {
+      val sys = auth(Role.SYSTEM_MANAGER, dealershipId = None)
+      (the[AppError] thrownBy Fixture().service.listBays(sys)).code shouldBe "DEALERSHIP_REQUIRED"
+      noException should be thrownBy Fixture().service.listBays(sys, Some("d1"))
     }
   }
 
@@ -192,6 +198,7 @@ class AdminServicesSpec extends AnyFunSpec with Matchers:
     val bike = Vehicle("v1", VehicleType.MOTORBIKE, "Honda", "Wave", None, "59A-123", None, None)
     object Repo extends VehicleRepository:
       def listByOwner(ownerId: String): Seq[Vehicle] = if ownerId == "u1" then Seq(bike) else Nil
+      def listAll(): Seq[OwnedVehicle] = Seq(OwnedVehicle(bike, "Owner", "owner@test.local"))
       def findOwned(ownerId: String, vehicleId: String): Option[Vehicle] = Option.when(ownerId == "u1" && vehicleId == "v1")(bike)
       def add(ownerId: String, v: NewVehicle): Vehicle = bike.copy(id = "v2", plate = v.plate)
 

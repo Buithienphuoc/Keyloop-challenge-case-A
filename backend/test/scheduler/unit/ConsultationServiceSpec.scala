@@ -157,6 +157,6 @@ class ConsultationServiceSpec extends AnyFunSpec with Matchers:
     }
 
     it("refuses the dealership list to an account without a dealership") {
-      statusOf(Fixture().service.listForDealership(auth(Role.SYSTEM_MANAGER, dealershipId = None), None)) shouldBe 403
+      statusOf(Fixture().service.listForDealership(auth(Role.SERVICE_ADVISOR, dealershipId = None), None)) shouldBe 403
     }
   }

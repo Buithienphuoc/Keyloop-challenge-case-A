@@ -1,9 +1,7 @@
-import { Link } from 'react-router-dom';
-import type { ServicePackage, Vehicle } from '../../../api/types';
+import type { ServicePackage } from '../../../api/types';
 import { duration, money } from '../../../lib/format';
 
 interface Props {
-  vehicle: Vehicle;
   packages: ServicePackage[];
   packageId: string | null;
   /** A known package is chosen, so the time step can open. */
@@ -13,8 +11,8 @@ interface Props {
   onNext: () => void;
 }
 
-/** Step 2: pick a maintenance package that fits the vehicle, or ask an advisor instead. */
-export function ServiceStep({ vehicle, packages, packageId, ready, onChoose, onBack, onNext }: Props) {
+/** Step 2: pick a maintenance package that fits the vehicle. */
+export function ServiceStep({ packages, packageId, ready, onChoose, onBack, onNext }: Props) {
   return (
     <div className="stack">
       <div className="spread">
@@ -47,11 +45,6 @@ export function ServiceStep({ vehicle, packages, packageId, ready, onChoose, onB
             </span>
           </button>
         ))}
-      </div>
-      <div className="notice notice-info">
-        Something specific, like a strange noise or a warning light?{' '}
-        <Link to={`/requests/new?kind=INSPECTION&vehicle=${vehicle.id}`}>Describe it to an advisor first</Link>; they will tell you what
-        it needs and how long it takes.
       </div>
       <div className="nav-buttons">
         <button className="btn" onClick={onBack}>

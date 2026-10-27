@@ -3,52 +3,33 @@ import type { Role } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_LABEL } from '../lib/format';
 
-const NAV: Record<Role, { to: string; label: string }[]> = {
+interface NavItem {
+  to: string;
+  label: string;
+}
+
+/**
+ * The brief needs three roles: the customer books, the technician does the work, the system
+ * manager sees everything. Other roles in the database have no menu (see App: RoleNotUsedPage).
+ */
+const NAV: Record<Role, NavItem[]> = {
   CUSTOMER: [
     { to: '/', label: 'Home' },
     { to: '/book', label: 'Book a service' },
     { to: '/appointments', label: 'My appointments' },
-    { to: '/requests', label: 'Advice requests' },
-    { to: '/advisor', label: 'Meet an advisor' },
     { to: '/vehicles', label: 'My vehicles' },
   ],
-  SERVICE_ADVISOR: [
-    { to: '/staff/advisor-appointments', label: 'Appointments' },
-    { to: '/services/open', label: 'New services' },
-    { to: '/staff/board', label: 'Workshop day' },
-    { to: '/staff/appointments', label: 'All appointments' },
-    { to: '/staff/requests', label: 'Advice requests' },
-    { to: '/staff/workload', label: 'Workload' },
-    { to: '/parts', label: 'Parts' },
-  ],
-  ADMIN: [
-    { to: '/staff/board', label: 'Workshop day' },
-    { to: '/staff/advisor-appointments', label: 'Appointments' },
-    { to: '/admin/jobs', label: 'Jobs & payments' },
-    { to: '/staff/appointments', label: 'All appointments' },
-    { to: '/staff/requests', label: 'Advice requests' },
-    { to: '/staff/workload', label: 'Workload' },
-    { to: '/parts', label: 'Parts' },
-    { to: '/admin', label: 'Bays, team & hours' },
-  ],
-  WORKSHOP_CONTROLLER: [
-    { to: '/staff/board', label: 'Workshop day' },
-    { to: '/staff/workload', label: 'Workload' },
-    { to: '/parts', label: 'Parts' },
-  ],
-  PARTS_STAFF: [{ to: '/parts', label: 'Parts orders & stock' }],
-  TECHNICIAN: [
-    { to: '/services/open', label: 'New services' },
-    { to: '/jobs', label: 'My jobs' },
-    { to: '/staff/appointments', label: 'All appointments' },
-    { to: '/staff/requests', label: 'Advice requests' },
-    { to: '/parts', label: 'Parts' },
-  ],
+  TECHNICIAN: [{ to: '/jobs', label: 'Service requests' }],
   SYSTEM_MANAGER: [
     { to: '/system', label: 'Dealerships' },
+    { to: '/system/data', label: 'All data' },
     { to: '/system/people', label: 'People' },
     { to: '/system/packages', label: 'Service packages' },
   ],
+  SERVICE_ADVISOR: [],
+  ADMIN: [],
+  WORKSHOP_CONTROLLER: [],
+  PARTS_STAFF: [],
 };
 
 export function Layout() {
@@ -66,7 +47,7 @@ export function Layout() {
           </Link>
           <nav className="nav" aria-label="Main">
             {NAV[user.role].map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.to === '/'}>
+              <NavLink key={n.to} to={n.to} end>
                 {n.label}
               </NavLink>
             ))}

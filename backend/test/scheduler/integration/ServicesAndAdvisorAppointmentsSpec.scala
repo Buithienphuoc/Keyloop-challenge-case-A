@@ -125,14 +125,14 @@ class ServicesAndAdvisorAppointmentsSpec extends AnyFunSpec with Matchers with B
       post(s"/api/appointments/${idOf(openServices().head)}/technician", controller).status shouldBe 403
     }
 
-    it("books new customer jobs as open") {
+    it("books new customer jobs with the technician they reserve already assigned") {
       val essential = h.idOf(SQL"SELECT id FROM service_packages WHERE code = 'MB-ESSENTIAL'")
       val bike = h.idOf(SQL"SELECT id FROM vehicles WHERE plate = '59-X1 234.56'")
       val res = post("/api/appointments", customer,
         Json.obj("dealershipId" -> d1, "vehicleId" -> bike, "start" -> s"${Wed}T08:00:00+07:00", "packageId" -> essential))
       res.status shouldBe 201
-      (res.json \ "technicianAssigned").as[Boolean] shouldBe false
-      openServices().map(idOf) should contain(res.str("id"))
+      (res.json \ "technicianAssigned").as[Boolean] shouldBe true
+      openServices().map(idOf) should not contain res.str("id")
     }
   }
 
