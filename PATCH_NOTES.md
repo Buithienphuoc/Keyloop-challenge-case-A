@@ -13,7 +13,7 @@ Entry format:
 
 ## Unreleased
 
-### #PR Awaiting payment step and the admin's job list (`feature/awaiting-payment`)
+### #20 Awaiting payment step and the admin's job list (`feature/awaiting-payment`)
 - **Added:** a job now goes IN_PROGRESS → AWAITING_PAYMENT → COMPLETED. The technician or
   advisor finishes it once the customer has checked the vehicle; only the dealership admin
   closes it after the customer has paid ("Payment received"). There is no bank integration, so
