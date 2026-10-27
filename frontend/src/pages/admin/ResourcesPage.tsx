@@ -100,7 +100,7 @@ function Bays() {
                   <td>{b.bayTypeName}</td>
                   <td>{b.isActive ? 'In use' : 'Out of service'}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn btn-sm" onClick={() => toggle.mutate(b)}>
+                    <button className="btn btn-sm" disabled={toggle.isPending} onClick={() => toggle.mutate(b)}>
                       {b.isActive ? 'Take out of service' : 'Put back in service'}
                     </button>
                   </td>
@@ -192,7 +192,7 @@ function Technicians() {
                     <div className="muted small">{weekdays(t.workDays)}</div>
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn btn-sm" onClick={() => toggle.mutate(t)}>
+                    <button className="btn btn-sm" disabled={toggle.isPending} onClick={() => toggle.mutate(t)}>
                       {t.isActive ? 'Deactivate' : 'Reactivate'}
                     </button>
                   </td>

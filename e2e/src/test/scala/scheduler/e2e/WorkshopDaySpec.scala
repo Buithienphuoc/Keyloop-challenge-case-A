@@ -10,24 +10,33 @@ import org.openqa.selenium.By
  * finished jobs wait for payment until the dealership admin records it (UC36); only then
  * does the customer see them as finished. The jobs are started days before their booked
  * time, which is allowed (the vehicle can arrive early).
- * Three bookings on three quiet weekdays, so they never compete with each other.
+ * Three bookings on three quiet weekdays, so they never compete with each other, for three
+ * motorbikes: a vehicle with a live appointment cannot be booked again until it is cancelled.
  */
 class WorkshopDaySpec extends E2ESuite with CustomerSteps:
   private val email = s"e2e-day-$run@demo.vn"
   private val password = "E2eTest2026"
-  private val plate = newPlate("59-W4")
+  /** One motorbike per booking, by its role in the story. */
+  private val plates = Map("advisor" -> newPlate("59-W4"), "technician" -> newPlate("59-W5"), "cancelled" -> newPlate("59-W6"))
   private val technicianWithLogin = "Trần Quốc Hùng" // tech.hung@demo.vn
-  private val days = Seq(quietWeekday(0, from = 5), quietWeekday(1, from = 5), quietWeekday(2, from = 5))
+  // Weekdays no other suite books: with `from = 5` these used to fall on BookingJourneySpec's
+  // day whenever day 4 and day 5 were a weekend, and a job finished early frees its stand, so
+  // the two blocks overlapped on the board.
+  private val days = Seq(quietWeekday(8), quietWeekday(9), quietWeekday(10))
 
   /** Booking references by role in the story: advisor's job, technician's job, cancelled job. */
   private var refs = Map.empty[String, String]
   private def ref(key: String): String = refs.getOrElse(key, cancel(s"the $key booking did not finish"))
 
-  /** The board's side panel for booking `ref` on its day. */
-  private def openOnBoard(reference: String, dayIndex: Int): Unit =
+  private def jobOnBoard(key: String): By =
+    By.xpath(s"//button[contains(@class,'job') and .//strong[normalize-space(.)=${Ui.literal(plates(key))}]]")
+
+  /** The board's side panel for the `key` booking on its day. */
+  private def openOnBoard(key: String, dayIndex: Int): Unit =
+    val reference = ref(key)
     ui.open("/staff/board")
     ui.goToDay(days(dayIndex))
-    ui.click(By.xpath(s"//button[contains(@class,'job') and .//strong[normalize-space(.)=${Ui.literal(plate)}]]"))
+    ui.click(jobOnBoard(key))
     ui.see(reference)
 
   private def panelStatus: String = ui.visible(By.cssSelector("aside .pill")).getText
@@ -37,18 +46,22 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
       register("E2E Workshop", email, password)
       ui.open("/vehicles")
       ui.clickButton("Add your first vehicle")
-      fillVehicle("Honda", "Wave Alpha", plate)
-      ui.see(plate)
-      refs = Map("advisor" -> bookEssential(days(0)), "technician" -> bookEssential(days(1)), "cancelled" -> bookEssential(days(2)))
+      fillVehicle("Honda", "Wave Alpha", plates("advisor"))
+      ui.see(plates("advisor"))
+      for key <- Seq("technician", "cancelled") do
+        ui.clickButton("Add a vehicle")
+        fillVehicle("Honda", "Wave Alpha", plates(key))
+        ui.see(plates(key))
+      refs = Map("advisor" -> bookEssential(days(0), plates("advisor")), "technician" -> bookEssential(days(1), plates("technician")),
+        "cancelled" -> bookEssential(days(2), plates("cancelled")))
       ui.signOut()
     }
   }
 
   describe("Service advisor on the day board (UC30, UC32, UC33)") {
     it("does not offer no-show before the start time") {
-      val r = ref("advisor")
       ui.signIn("advisor.d1@demo.vn")
-      openOnBoard(r, 0)
+      openOnBoard("advisor", 0)
       panelStatus shouldBe "Confirmed"
       ui.visible(ui.button("Vehicle arrived, start work"))
       ui.all(ui.button("Customer did not come")) shouldBe empty
@@ -65,13 +78,10 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
     }
 
     it("cancels a booking before work starts") {
-      val r = ref("cancelled")
-      openOnBoard(r, 2)
+      openOnBoard("cancelled", 2)
       ui.clickButton("Cancel booking")
       // A cancelled job leaves the board, which frees its bay and technician.
-      ui.eventually("the job leaves the board") {
-        ui.all(By.xpath(s"//button[contains(@class,'job') and .//strong[normalize-space(.)=${Ui.literal(plate)}]]")).isEmpty
-      }
+      ui.eventually("the job leaves the board") { ui.all(jobOnBoard("cancelled")).isEmpty }
       refs -= "cancelled"
       ui.signOut()
     }
@@ -79,9 +89,8 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
 
   describe("Dealership admin (an advisor and more)") {
     it("gives the second job to the technician who has a login") {
-      val r = ref("technician")
       ui.signIn("admin.d1@demo.vn")
-      openOnBoard(r, 1)
+      openOnBoard("technician", 1)
       val current = ui.visible(By.cssSelector("dl.kv")).getText
       if !current.contains(technicianWithLogin) then
         ui.select("Technician").selectByVisibleText(technicianWithLogin)
@@ -100,7 +109,7 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
       ui.signIn("tech.hung@demo.vn")
       ui.waitForPath("/jobs")
       ui.goToDay(days(1))
-      val card = By.xpath(s"//article[contains(@class,'job-card') and .//*[normalize-space(.)=${Ui.literal(plate)}]]")
+      val card = By.xpath(s"//article[contains(@class,'job-card') and .//*[normalize-space(.)=${Ui.literal(plates("technician"))}]]")
       ui.visible(card).getText should include("Essential maintenance")
       ui.click(ui.visible(card).findElement(By.xpath(".//button[normalize-space(.)='Start job']")))
       ui.eventually("the job is in the workshop") { ui.visible(card).getText.contains("In the workshop") }
@@ -143,7 +152,7 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
       ui.click(By.xpath("//button[@role='tab' and starts-with(normalize-space(.),'Finished')]"))
       for key <- Seq("advisor", "technician") do ui.visible(jobRow(ref(key))).getText should include("Finished")
       ui.click(By.xpath("//button[@role='tab' and starts-with(normalize-space(.),'Cancelled')]"))
-      ui.visible(By.xpath(s"//*[@data-job and contains(normalize-space(.), ${Ui.literal(plate)})]")).getText should include("Cancelled")
+      ui.visible(By.xpath(s"//*[@data-job and contains(normalize-space(.), ${Ui.literal(plates("cancelled"))})]")).getText should include("Cancelled")
       ui.signOut()
     }
   }

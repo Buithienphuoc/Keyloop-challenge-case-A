@@ -13,6 +13,30 @@ Entry format:
 
 ## Unreleased
 
+### #21 Pressing Book many times never books twice (`fix/double-booking`)
+- **Fixed:** several bookings or holds for the same vehicle at once (a double tap, two tabs, a
+  retry without an Idempotency-Key) waited on each other inside the database and took one to
+  two minutes to answer while PostgreSQL broke the deadlocks one by one. They now queue on a
+  per-vehicle lock: the first is booked and every other one is answered at once.
+- **Changed:** a vehicle has at most one live appointment (on hold, booked or in the
+  workshop). Booking it again is refused with `409 VEHICLE_HAS_APPOINTMENT`, which names that
+  appointment, until it is cancelled or done. My vehicles, the vehicle step, Advice requests
+  and Home lock "Book a service" / "Pick a time" for such a vehicle and say which booking to
+  cancel in My appointments.
+- **Fixed:** changing the time while the first hold was still on its way left that hold
+  behind (an orphan HELD for ten minutes); a new hold now waits until the earlier one is given
+  back. Confirm is sent once however often it is pressed.
+- **Changed:** the web client sends an identical change (POST, PATCH, PUT, DELETE) only once
+  while it is on its way, so no button can write twice from clicks inside one frame; the admin
+  and package on/off toggles are also disabled while saving.
+- **Tests:** backend: 50 concurrent presses per case (new key per press, no key, holds from
+  several tabs, hold and booking together, overlapping times, 50 Confirms on one hold), each
+  answered in under 15 s with one appointment; FeaturesSpec checks the one-live-appointment rule
+  and that a lapsed hold frees the vehicle. e2e: `DoubleSubmitSpec` (9 tests, slowed network,
+  5 clicks at once, double-clicks, two tabs, locked buttons). WorkshopDaySpec books three
+  vehicles and moves to days no other suite uses (it shared BookingJourneySpec's day when
+  days 4 and 5 were a weekend).
+
 ### #20 Awaiting payment step and the admin's job list (`feature/awaiting-payment`)
 - **Added:** a job now goes IN_PROGRESS → AWAITING_PAYMENT → COMPLETED. The technician or
   advisor finishes it once the customer has checked the vehicle; only the dealership admin

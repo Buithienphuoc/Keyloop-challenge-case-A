@@ -134,6 +134,11 @@ final class BookingService(
       writer.lockIdempotencyKey(s, auth.userId, key)
       if writer.findIdByIdempotencyKey(s, auth.userId, key).isDefined then throw AlreadyBooked()
     }
+    // One attempt per vehicle at a time. Without it, several presses for the same vehicle
+    // (a double tap, two tabs) insert overlapping rows that wait on each other inside the
+    // vehicle EXCLUDE constraint until PostgreSQL breaks the deadlock, one per second. In a
+    // queue, the first commits and every later one fails that constraint at once (409).
+    writer.lockVehicle(s, vehicleId)
     val WorkshopResources(bays, technicians) = calendar.activeResources(s, dealership.id)
     if !isOfferedHere(requirement, bays, technicians) then
       throw AppError.unprocessable("NOT_OFFERED_HERE", "This dealership has no bay or technician for this job")
@@ -142,6 +147,9 @@ final class BookingService(
     // could stand in this booking's way, so the constraints only see live reservations.
     val now = clock()
     Holds.releaseExpired(s, writer, consultations, now, HoldScope.Around(dealership.id, Some(vehicleId), dayStart, dayEnd))
+    // One live appointment per vehicle: it is booked again only once that one is cancelled
+    // or done. Checked under the vehicle lock, so presses that queued behind the first see it.
+    writer.liveAppointmentOf(s, vehicleId, now).foreach(vehicleHasAppointment(plan, _, log))
     val busy = calendar.busyPeriods(s, dealership.id, dayStart, dayEnd, now)
     val allocation = Availability.allocate(requirement, start, bays, technicians, busy).allocation.getOrElse(throw NoCapacity())
 
@@ -183,6 +191,16 @@ final class BookingService(
     log.info(if plan.hold then "booking.held" else "booking.created", plan.logContext ++ Seq("appointmentId" -> id,
       "reference" -> appointment.reference, "attempt" -> n, "bayId" -> appointment.bay.id, "technicianId" -> appointment.technician.id)*)
     BookingResult(appointment, replayed = false)
+
+  /** The vehicle is already on hold, booked or in the workshop: 409 naming that appointment. */
+  private def vehicleHasAppointment(plan: Plan, live: LiveAppointment, log: Log): Nothing =
+    log.info("booking.vehicle_has_appointment", plan.logContext :+ ("reference" -> live.reference)*)
+    throw AppError.conflict(
+      "VEHICLE_HAS_APPOINTMENT",
+      s"This vehicle already has appointment ${live.reference}. Cancel it in My appointments before booking it again.",
+      Some(Json.obj("reference" -> live.reference, "status" -> live.status.toString,
+        "start" -> JsonFormats.offsetIso(live.start.atZone(plan.rules.timezone))))
+    )
 
   /** Nothing left at that time: 409 with the nearest free times. */
   private def slotUnavailable(plan: Plan, log: Log): Nothing =

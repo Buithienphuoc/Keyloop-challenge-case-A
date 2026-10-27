@@ -124,6 +124,22 @@ final class PgSchedulingStore extends SchedulingStore:
     SQL"SELECT pg_advisory_xact_lock(hashtextextended($lockName, 0))".execute()
     ()
 
+  def lockVehicle(s: DbSession, vehicleId: String): Unit =
+    given java.sql.Connection = Sql.connection(s)
+    val lockName = s"booking-vehicle:$vehicleId"
+    SQL"SELECT pg_advisory_xact_lock(hashtextextended($lockName, 0))".execute()
+    ()
+
+  def liveAppointmentOf(s: DbSession, vehicleId: String, asOf: Instant): Option[LiveAppointment] =
+    given java.sql.Connection = Sql.connection(s)
+    SQL"""
+      SELECT reference, status, lower(period) AS s FROM appointments
+      WHERE vehicle_id = $vehicleId::uuid
+        AND (status IN ('CONFIRMED', 'IN_PROGRESS') OR (status = 'HELD' AND hold_expires_at > ${ts(asOf)}))
+      ORDER BY lower(period) LIMIT 1""".as(Sql.rows { r =>
+      LiveAppointment(r.str("reference"), AppointmentStatus.valueOf(r.str("status")), r.instant("s"))
+    }.singleOpt)
+
   def get(s: DbSession, id: String): Option[AppointmentView] =
     given java.sql.Connection = Sql.connection(s)
     SQL(s"$ViewSelect WHERE a.id = {id}::uuid").on("id" -> id).as(view.singleOpt)

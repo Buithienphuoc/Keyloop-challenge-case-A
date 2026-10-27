@@ -5,8 +5,8 @@ Every drawn use case and every branch of the three activity diagrams in
 real browser. The backend tests (`backend/test/…`) prove the rules; these prove that a person
 can actually follow the drawn flow on screen.
 
-Run: `docker compose --profile full up -d --build`, then `cd e2e && sbt test` (57 tests, about
-two minutes). Against `npm run dev` instead: `BASE_URL=http://localhost:5173 sbt test`.
+Run: `docker compose --profile full up -d --build`, then `cd e2e && sbt test` (69 tests, about
+three minutes). Against `npm run dev` instead: `BASE_URL=http://localhost:5173 sbt test`.
 
 ## Use cases
 
@@ -53,6 +53,8 @@ two minutes). Against `npm run dev` instead: `BASE_URL=http://localhost:5173 sbt
 | | Booked? yes → reference, technician, ticket | every booking |
 | | Booked? no → "taken a moment ago" + nearest times → book one | `BookingRulesSpec` |
 | | Optionally add to calendar | `BookingRulesSpec` |
+| | Pressed again before the answer (many clicks, slow network, two tabs) → still one appointment | `DoubleSubmitSpec` |
+| | Vehicle already has a live appointment → booking locked until it is cancelled | `DoubleSubmitSpec` |
 | Consult first | Customer sends inspection / customisation | `ConsultFirstSpec` |
 | | Advisor: can the workshop do it? no → decline with a reason → REJECTED, customer reads it | `ConsultFirstSpec` |
 | | yes → time, skill, bay, estimate, message → APPROVED | `ConsultFirstSpec` |

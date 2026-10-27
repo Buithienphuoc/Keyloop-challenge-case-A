@@ -32,6 +32,13 @@ class FeaturesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
   private def vehicle(plate: String) = h.idOf(SQL"SELECT id FROM vehicles WHERE plate = $plate")
   private lazy val airBlade = vehicle("59-X1 234.56")
   private lazy val exciter = vehicle("59-T2 678.90")
+  // A vehicle is booked again only once its live appointment is cancelled or done, so the
+  // hold tests each take a vehicle of their own.
+  private var bikes = 0
+  private def newBike(owner: String = customer): String =
+    bikes += 1
+    post("/api/me/vehicles", owner, Json.obj("vehicleType" -> "MOTORBIKE", "make" -> "Honda", "model" -> "Vision",
+      "plate" -> f"59-H9 $bikes%03d.00")).str("id")
   private def technician(name: String) = h.idOf(SQL"SELECT id FROM technicians WHERE display_name = $name")
   private def bay(name: String) = h.idOf(SQL"SELECT b.id FROM service_bays b WHERE b.dealership_id = $d1::uuid AND b.name = $name")
 
@@ -72,7 +79,7 @@ class FeaturesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
     }
 
     it("confirms a running hold, and confirming twice answers the same booking") {
-      val id = hold(customer, exciter, s"${Wed}T13:00:00+07:00").str("id")
+      val id = hold(customer, newBike(), s"${Wed}T13:00:00+07:00").str("id")
       h.clock.set("2026-11-02T07:09:00+07:00")
       val confirmed = post(s"/api/appointments/$id/confirm", customer)
       confirmed.status shouldBe 200
@@ -85,7 +92,7 @@ class FeaturesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
 
     it("refuses to confirm a hold that ran out and frees the slot") {
       val before = capacity(Wed, "15:00")
-      val id = hold(customer, airBlade, s"${Wed}T15:00:00+07:00").str("id")
+      val id = hold(customer, newBike(), s"${Wed}T15:00:00+07:00").str("id")
       capacity(Wed, "15:00") shouldBe before - 1
       h.clock.set("2026-11-02T07:11:00+07:00")
       capacity(Wed, "15:00") shouldBe before // already ignored before anyone sweeps it
@@ -98,9 +105,9 @@ class FeaturesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
 
     it("lets someone else book the last place once a hold on it runs out, without waiting for the sweeper") {
       capacity(Tue, "09:00") shouldBe 1
-      hold(customer, airBlade, s"${Tue}T09:00:00+07:00").status shouldBe 201
+      hold(customer, newBike(), s"${Tue}T09:00:00+07:00").status shouldBe 201
       capacity(Tue, "09:00") shouldBe 0
-      val walkinBike = h.idOf(SQL"SELECT v.id FROM vehicles v JOIN users u ON u.id = v.owner_id WHERE u.email = 'walkin3@demo.vn'")
+      val walkinBike = newBike(walkin3Token) // their seeded bike is already booked
       def bookIt() = post("/api/appointments", walkin3Token, Json.obj("dealershipId" -> d1, "vehicleId" -> walkinBike,
         "packageId" -> essential, "start" -> s"${Tue}T09:00:00+07:00"))
       bookIt().errorCode shouldBe "SLOT_UNAVAILABLE"
@@ -124,10 +131,25 @@ class FeaturesSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       h.clock.set(Now)
     }
 
-    it("lets the customer release a hold by cancelling it") {
-      val id = hold(customer, airBlade, s"${Wed}T16:00:00+07:00").str("id")
+    it("lets the customer release a hold by cancelling it, and only then hold that vehicle again") {
+      val bike = newBike()
+      val first = hold(customer, bike, s"${Wed}T16:00:00+07:00")
+      val id = first.str("id")
+      val again = hold(customer, bike, s"${Wed}T08:00:00+07:00") // another time, not overlapping
+      again.status shouldBe 409
+      again.errorCode shouldBe "VEHICLE_HAS_APPOINTMENT"
+      (again.json \ "error" \ "details" \ "reference").as[String] shouldBe first.str("reference")
       post(s"/api/appointments/$id/cancel", customer, Json.obj()).str("status") shouldBe "CANCELLED"
       post(s"/api/appointments/$id/confirm", customer).errorCode shouldBe "NOT_HELD"
+      hold(customer, bike, s"${Wed}T08:00:00+07:00").status shouldBe 201
+    }
+
+    it("lets a vehicle whose hold ran out be held again") {
+      val bike = newBike()
+      hold(customer, bike, s"${Wed}T08:30:00+07:00").status shouldBe 201
+      h.clock.set("2026-11-02T07:11:00+07:00")
+      hold(customer, bike, s"${Wed}T08:30:00+07:00").status shouldBe 201
+      h.clock.set(Now)
     }
   }
 

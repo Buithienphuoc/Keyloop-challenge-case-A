@@ -161,9 +161,10 @@ cd e2e && sbt test                            # BASE_URL=http://localhost:8080 b
 | `ConsultFirstSpec` | The consult-first activity diagram: an inspection and a customisation request; the advisor approves one (time, skill, estimate, message) and declines the other (a reason is required); the customer reads both replies, books the approved one, cancels it (the request re-opens) and withdraws it |
 | `WorkshopDaySpec` | The workshop day diagram and the appointment lifecycle: no-show is not offered before the start; the advisor starts and finishes one job, the admin hands another to tech.hung, who starts and finishes it in My jobs; the advisor cancels a third; the customer sees Done and Cancelled |
 | `BookingRulesSpec` | The checks in the booking diagram: My vehicles; only packages for the vehicle's type; "cannot do this job" at a dealership without a car lift; another customer takes the chosen time first (through the API), so the page offers the nearest free times and one is booked; the `.ics` calendar file |
+| `DoubleSubmitSpec` | The main feature's worst case, on a slowed-down network: Hold and Confirm each clicked five times at once and double-clicked, the time changed while the hold is still on its way, the same vehicle held from two tabs. Each ends with one appointment and no false error. A booked vehicle's buttons are locked (and the API refuses it) until the booking is cancelled |
 | `AdminSpec` | Set-up that someone else then uses: the admin adds a bay (and takes it out of service), a technician with a login and an advisor account, and both sign in; the system manager onboards a dealership, sees its zero capacity, its admin signs in, and customers are told it cannot do the job yet. Adds rows, tagged with the run, that only a database reset removes |
 
-57 tests, about two minutes. Each use case and activity-diagram branch is mapped to its test in
+69 tests, about three minutes. Each use case and activity-diagram branch is mapped to its test in
 [docs/e2e-traceability.md](docs/e2e-traceability.md), together with the places where the code
 has moved ahead of the diagrams. CI runs them on every pull request against the freshly built images;
 a failure uploads a screenshot of each failing step and the API logs. Writing them found a real
@@ -304,6 +305,13 @@ eroding.
    nearest alternatives.
 5. An optional `Idempotency-Key` makes retries and double taps safe: the same key returns the
    original appointment (`200`, `Idempotent-Replayed: true`).
+6. **One live appointment per vehicle.** Requests for the same vehicle queue on a per-vehicle
+   lock, and a vehicle that is already on hold, booked or in the workshop is refused with
+   `409 VEHICLE_HAS_APPOINTMENT` (naming that appointment) until it is cancelled or done. So
+   pressing Book several times, from one tab or several, without an idempotency key, still
+   books once, and answers at once instead of waiting on each other. The pages lock booking for
+   such a vehicle and say which appointment to cancel; the web client also sends an identical
+   change only once while it is on its way, for every button.
 
 ### Technology choices
 
