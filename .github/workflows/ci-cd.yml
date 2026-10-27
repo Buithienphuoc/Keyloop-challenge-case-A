@@ -71,7 +71,7 @@ jobs:
       contents: read
       id-token: write # OpenID Connect sign-in to Azure
     env:
-      DEPLOY: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AZURE_CLIENT_ID != '' }}
+      DEPLOY: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && vars.AZURE_CLIENT_ID != '' }}
       RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-service-scheduler' }}
     outputs:
       registry: ${{ steps.registry.outputs.server }}
@@ -149,7 +149,7 @@ jobs:
     name: Deploy to Azure Container Apps
     runs-on: ubuntu-latest
     needs: images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AZURE_CLIENT_ID != ''
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && vars.AZURE_CLIENT_ID != ''
     environment:
       name: production
       url: ${{ steps.rollout.outputs.url }}
@@ -190,8 +190,13 @@ jobs:
             --secrets "database-url=$prod_url" "seed-accounts=$SEED_ACCOUNTS" -o none
       - name: Roll out the new images
         id: rollout
+        env:
+          SEED_ACCOUNTS: ${{ secrets.PROD_SEED_ACCOUNTS }}
         run: |
           exec 2> >(tee "$RUNNER_TEMP/rollout.err" >&2) # kept for the failure report below
+          # A fingerprint of the hashed passwords: when the secret changes, so does the API's
+          # configuration, so a re-run on the same commit still starts a revision that applies them.
+          SEED_ACCOUNTS_VERSION=$(printf '%s' "$SEED_ACCOUNTS" | sha256sum | cut -c1-12)
           az config set extension.use_dynamic_install=yes_without_prompt --only-show-errors
           # The apps are created with a placeholder image on port 80. Point ingress at our ports
           # before the new image goes in: ingress is app-wide (no new revision), and a revision
@@ -215,7 +220,7 @@ jobs:
           # API first: the database migrates on its start-up, before the new web app needs it.
           az containerapp update -g "$RESOURCE_GROUP" -n scheduler-api \
             --image "$REGISTRY/service-scheduler-api:${{ github.sha }}" \
-            --set-env-vars APP_PROFILE=prod SEED_ACCOUNT_PASSWORDS=secretref:seed-accounts \
+            --set-env-vars APP_PROFILE=prod SEED_ACCOUNT_PASSWORDS=secretref:seed-accounts "SEED_ACCOUNTS_VERSION=$SEED_ACCOUNTS_VERSION" \
             --only-show-errors -o none
           az containerapp update -g "$RESOURCE_GROUP" -n scheduler-web \
             --image "$REGISTRY/service-scheduler-web:${{ github.sha }}" --only-show-errors -o none

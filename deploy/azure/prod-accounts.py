@@ -10,9 +10,14 @@ writes two files into OUT_DIR:
                                  and variables -> Actions). The deploy job hands it to the API as
                                  SEED_ACCOUNT_PASSWORDS, so the plain passwords never leave OUT_DIR.
 
-The hashes use the API's own format (scheduler.modules.identity.Passwords). They are applied when
-an account is created, i.e. on a new, empty database: to change the passwords of a live site,
-generate new ones and start from a fresh database.
+Run it on your own computer (Python 3, standard library only), so the plain passwords exist
+nowhere else. The hashes use the API's own format (scheduler.modules.identity.Passwords).
+
+Changing the passwords of the live site:
+  1. run this script again,
+  2. replace the GitHub secret PROD_SEED_ACCOUNTS with the new PROD_SEED_ACCOUNTS.secret.txt,
+  3. run the CI/CD workflow on master (Actions -> CI/CD -> Run workflow).
+On start-up the API sets every listed account to its new password and signs it out everywhere.
 """
 import base64
 import hashlib
