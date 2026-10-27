@@ -91,3 +91,12 @@ final class SchedulingController(
   def reassign(id: String): Action[AnyContent] = guard(WORKSHOP_CONTROLLER, ADMIN).async { req =>
     json()(dispatch.reassign(req.auth, uuid(id), body[Reassignment](req), req.log))
   }
+
+  def openServices: Action[AnyContent] = guard(TECHNICIAN, SERVICE_ADVISOR, ADMIN, WORKSHOP_CONTROLLER).async { req =>
+    json()(appointments.listOpenServices(req.auth))
+  }
+
+  /** A technician takes a job (no body needed); an advisor assigns a technician. */
+  def assignTechnician(id: String): Action[AnyContent] = guard(TECHNICIAN, SERVICE_ADVISOR).async { req =>
+    json()(dispatch.assignTechnician(req.auth, uuid(id), body[TechnicianAssignmentRequest](req), req.log))
+  }

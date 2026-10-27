@@ -199,6 +199,25 @@ components:
         cancelReason: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
         holdExpiresAt: { type: [string, 'null'], format: date-time, description: Only while HELD }
+        technicianAssigned:
+          type: boolean
+          description: >-
+            False while the service job is open: the technician shown is only reserved by the booking, and
+            nobody has taken the job yet (a technician taking it, or an advisor assigning one).
+    AdvisorAppointment:
+      type: object
+      description: A meeting with a service advisor. Not a service job (no vehicle, bay or technician).
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string, example: AP-7K3Q9M }
+        status: { type: string, enum: [SCHEDULED, DONE, CANCELLED] }
+        start: { type: string, format: date-time }
+        dealership: { type: object }
+        customer: { type: object }
+        message: { type: string, description: What the customer wants to be advised about }
+        advisor: { type: [object, 'null'], description: Empty while the appointment is open }
+        cancelReason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
     Consultation:
       type: object
       properties:
@@ -465,6 +484,26 @@ paths:
         '200': { description: Moved, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
         '409': { description: RESOURCE_BUSY (the bay or technician has a job then) or NOT_REASSIGNABLE }
         '422': { description: BAY_TYPE_MISMATCH, TECHNICIAN_NOT_QUALIFIED, TECHNICIAN_NOT_ON_SHIFT, UNKNOWN_BAY, UNKNOWN_TECHNICIAN, NOTHING_TO_CHANGE }
+  /api/appointments/{id}/technician:
+    post:
+      tags: [Workshop control]
+      summary: Put a technician on a confirmed service job (technician takes it for themselves; advisor assigns one)
+      description: >-
+        A technician sends no body and takes the job; they can take open jobs only. An advisor gives the
+        technicianId and may not assign themselves or another advisor. Skill, shift and clash checks are as for a move.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { technicianId: { type: string, format: uuid } } } } } }
+      responses:
+        '200': { description: Assigned, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '403': { description: A technician naming someone else, or an account without a technician profile }
+        '409': { description: ALREADY_ASSIGNED, ALREADY_TAKEN, RESOURCE_BUSY or NOT_REASSIGNABLE }
+        '422': { description: CANNOT_ASSIGN_SELF, NOT_A_TECHNICIAN, TECHNICIAN_REQUIRED, TECHNICIAN_NOT_QUALIFIED, TECHNICIAN_NOT_ON_SHIFT, UNKNOWN_TECHNICIAN }
+  /api/staff/open-services:
+    get:
+      tags: [Workshop control]
+      summary: Confirmed service jobs of my dealership that no technician has taken yet, soonest first
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Appointment' } } } } }
   /api/me/appointments:
     get:
       tags: [Booking]
@@ -510,6 +549,69 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
         '409': { $ref: '#/components/responses/Error' }
 
+  /api/advisor-appointments:
+    post:
+      tags: [Advisor appointments]
+      summary: Book a meeting with an advisor (customer). It starts open, without an advisor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dealershipId, start, message]
+              properties:
+                dealershipId: { type: string, format: uuid }
+                start: { type: string, format: date-time, description: Within opening hours, on the slot grid }
+                message: { type: string, minLength: 5, maxLength: 2000 }
+      responses:
+        '201': { description: Booked, content: { application/json: { schema: { $ref: '#/components/schemas/AdvisorAppointment' } } } }
+        '422': { description: PAST_OR_TOO_SOON, TOO_FAR_AHEAD, OUTSIDE_OPENING_HOURS, NOT_ON_SLOT_GRID }
+  /api/me/advisor-appointments:
+    get:
+      tags: [Advisor appointments]
+      summary: My advisor appointments
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdvisorAppointment' } } } } }
+  /api/staff/advisor-appointments:
+    get:
+      tags: [Advisor appointments]
+      summary: My dealership's advisor appointments, open ones (open=true) or one local day (date)
+      parameters:
+        - { name: open, in: query, schema: { type: boolean } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdvisorAppointment' } } } } }
+  /api/advisor-appointments/{id}:
+    get:
+      tags: [Advisor appointments]
+      summary: One advisor appointment (customers see their own; staff see their dealership's)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AdvisorAppointment' } } } }
+  /api/advisor-appointments/{id}/take:
+    post:
+      tags: [Advisor appointments]
+      summary: An advisor takes an open appointment for themselves
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Taken, content: { application/json: { schema: { $ref: '#/components/schemas/AdvisorAppointment' } } } }
+        '409': { description: ALREADY_TAKEN, ADVISOR_BUSY or NOT_OPEN }
+  /api/advisor-appointments/{id}/complete:
+    post:
+      tags: [Advisor appointments]
+      summary: The advisor holding the appointment marks it done
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Done, content: { application/json: { schema: { $ref: '#/components/schemas/AdvisorAppointment' } } } }
+  /api/advisor-appointments/{id}/cancel:
+    post:
+      tags: [Advisor appointments]
+      summary: Cancel (the customer before it starts; advisor or admin of the dealership)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { reason: { type: string } } } } } }
+      responses:
+        '200': { description: Cancelled, content: { application/json: { schema: { $ref: '#/components/schemas/AdvisorAppointment' } } } }
   /api/consultations:
     post:
       tags: [Consultations]

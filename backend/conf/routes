@@ -22,6 +22,8 @@ POST    /api/appointments                  scheduler.modules.scheduling.adapters
 POST    /api/appointments/holds            scheduler.modules.scheduling.adapters.SchedulingController.hold
 POST    /api/appointments/:id/confirm      scheduler.modules.scheduling.adapters.SchedulingController.confirmHold(id: String)
 POST    /api/appointments/:id/reassign     scheduler.modules.scheduling.adapters.SchedulingController.reassign(id: String)
+POST    /api/appointments/:id/technician   scheduler.modules.scheduling.adapters.SchedulingController.assignTechnician(id: String)
+GET     /api/staff/open-services           scheduler.modules.scheduling.adapters.SchedulingController.openServices
 GET     /api/me/appointments               scheduler.modules.scheduling.adapters.SchedulingController.listMine
 GET     /api/appointments/:id              scheduler.modules.scheduling.adapters.SchedulingController.get(id: String)
 POST    /api/appointments/:id/cancel       scheduler.modules.scheduling.adapters.SchedulingController.cancel(id: String)
@@ -30,6 +32,15 @@ GET     /api/staff/appointments            scheduler.modules.scheduling.adapters
 GET     /api/staff/appointments/upcoming   scheduler.modules.scheduling.adapters.SchedulingController.dealershipUpcoming
 GET     /api/staff/workload                scheduler.modules.scheduling.adapters.SchedulingController.workload
 GET     /api/technician/jobs               scheduler.modules.scheduling.adapters.SchedulingController.technicianDay
+
+# ---- advisor appointments (meetings with a service advisor; not service jobs) ---------------
+POST    /api/advisor-appointments              scheduler.modules.advisory.adapters.AdvisorAppointmentController.book
+GET     /api/me/advisor-appointments           scheduler.modules.advisory.adapters.AdvisorAppointmentController.listMine
+GET     /api/staff/advisor-appointments        scheduler.modules.advisory.adapters.AdvisorAppointmentController.listForDealership
+GET     /api/advisor-appointments/:id          scheduler.modules.advisory.adapters.AdvisorAppointmentController.get(id: String)
+POST    /api/advisor-appointments/:id/take     scheduler.modules.advisory.adapters.AdvisorAppointmentController.take(id: String)
+POST    /api/advisor-appointments/:id/complete scheduler.modules.advisory.adapters.AdvisorAppointmentController.complete(id: String)
+POST    /api/advisor-appointments/:id/cancel   scheduler.modules.advisory.adapters.AdvisorAppointmentController.cancel(id: String)
 
 # ---- consultations (inspection / modification requests) --------------------------------------
 POST    /api/consultations                 scheduler.modules.consultation.adapters.ConsultationController.submit

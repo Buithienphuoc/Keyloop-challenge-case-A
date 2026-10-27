@@ -442,16 +442,19 @@ textarea.input {
   background: currentColor;
 }
 .pill-CONFIRMED,
+.pill-SCHEDULED,
 .pill-APPROVED {
   background: var(--lane-tint);
   color: var(--lane);
 }
 .pill-IN_PROGRESS,
+.pill-NEW,
 .pill-SUBMITTED {
   background: var(--hivis-tint);
   color: var(--amber);
 }
 .pill-COMPLETED,
+.pill-DONE,
 .pill-BOOKED {
   background: var(--go-tint);
   color: var(--go);

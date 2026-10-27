@@ -16,6 +16,8 @@ import play.filters.cors.{CORSConfig, CORSFilter}
 import router.Routes
 import scheduler.http.*
 import scheduler.modules.admin.adapters.{AdminController, PgWorkshopRepo}
+import scheduler.modules.advisory.adapters.{AdvisorAppointmentController, PgAdvisorAppointmentRepo}
+import scheduler.modules.advisory.application.AdvisorAppointmentService
 import scheduler.modules.admin.application.WorkshopAdminService
 import scheduler.modules.catalog.adapters.{CatalogController, PgCatalogRepo}
 import scheduler.modules.consultation.adapters.{ConsultationController, PgConsultationRepo}
@@ -106,6 +108,7 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
   val tenants = TenantService(db, PgTenantRepo(db), identity)
   val packages = PackageAdminService(PgPackageRepo(db))
   val parts = PartsService(db, PgPartsRepo(db))
+  val advisorAppointments = AdvisorAppointmentService(db, PgAdvisorAppointmentRepo(), catalog, clock)
 
   // ---- driving adapters (HTTP) ---------------------------------------------------------------
   private val guard = Guard(identity, controllerComponents.parsers.defaultBodyParser)
@@ -118,6 +121,7 @@ class AppComponents(context: Context, clock: () => Instant = () => Instant.now()
     CatalogController(controllerComponents, catalog),
     VehicleController(controllerComponents, guard, vehicles),
     SchedulingController(controllerComponents, guard, availability, booking, appointments, dispatch),
+    AdvisorAppointmentController(controllerComponents, guard, advisorAppointments),
     ConsultationController(controllerComponents, guard, consultations),
     AdminController(controllerComponents, guard, admin),
     SystemController(controllerComponents, guard, tenants, packages),

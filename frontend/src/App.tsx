@@ -21,12 +21,16 @@ import { PeoplePage } from './pages/system/PeoplePage';
 import { PackagesPage } from './pages/system/PackagesPage';
 import { PartsPage } from './pages/parts/PartsPage';
 import { WorkloadPage } from './pages/staff/WorkloadPage';
+import { AdvisorAppointmentsPage } from './pages/staff/AdvisorAppointmentsPage';
+import { OpenServicesPage } from './pages/staff/OpenServicesPage';
+import { AdvisorPage } from './pages/customer/AdvisorPage';
 
 const HOME: Record<Role, string> = {
   CUSTOMER: '/',
-  SERVICE_ADVISOR: '/staff/board',
+  // First screen after sign-in: what still needs someone (open appointments / open services).
+  SERVICE_ADVISOR: '/staff/advisor-appointments',
   ADMIN: '/staff/board',
-  TECHNICIAN: '/jobs',
+  TECHNICIAN: '/services/open',
   SYSTEM_MANAGER: '/system',
   WORKSHOP_CONTROLLER: '/staff/board',
   PARTS_STAFF: '/parts',
@@ -63,6 +67,9 @@ export function App() {
         <Route path="/requests" element={<Only roles={['CUSTOMER']}><RequestsPage /></Only>} />
         <Route path="/requests/new" element={<Only roles={['CUSTOMER']}><ConsultPage /></Only>} />
         <Route path="/vehicles" element={<Only roles={['CUSTOMER']}><VehiclesPage /></Only>} />
+        <Route path="/advisor" element={<Only roles={['CUSTOMER']}><AdvisorPage /></Only>} />
+        <Route path="/staff/advisor-appointments" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN']}><AdvisorAppointmentsPage /></Only>} />
+        <Route path="/services/open" element={<Only roles={['TECHNICIAN', 'SERVICE_ADVISOR']}><OpenServicesPage /></Only>} />
         <Route path="/staff/board" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER']}><BoardPage /></Only>} />
         <Route path="/staff/workload" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER']}><WorkloadPage /></Only>} />
         <Route path="/parts" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER', 'PARTS_STAFF', 'TECHNICIAN']}><PartsPage /></Only>} />

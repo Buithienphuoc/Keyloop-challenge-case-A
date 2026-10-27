@@ -41,6 +41,15 @@ final class AppointmentService(
     view
   }
 
+  /**
+   * Service jobs of the caller's dealership that nobody has taken yet, soonest first: the
+   * technician's first screen (jobs to take) and the advisor's list of jobs to assign.
+   */
+  def listOpenServices(auth: AuthContext): Seq[AppointmentView] =
+    val filter = AppointmentFilter(dealershipId = Some(auth.requireDealership), from = Some(clock()),
+      statuses = Set(AppointmentStatus.CONFIRMED), openOnly = true)
+    db.run(reader.list(_, filter))
+
   def listMine(auth: AuthContext): Seq[AppointmentView] = db.run(reader.list(_, AppointmentFilter(customerId = Some(auth.userId))))
 
   /** A dealership's appointments for one local day (advisor / admin board). */

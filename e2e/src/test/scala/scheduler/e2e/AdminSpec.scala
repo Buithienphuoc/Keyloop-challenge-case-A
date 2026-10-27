@@ -64,13 +64,14 @@ class AdminSpec extends E2ESuite with CustomerSteps:
       ui.signOut()
     }
 
-    it("the new technician signs in to their jobs, the new advisor to the day board") {
+    it("the new technician signs in to the open services, the new advisor to the open appointments") {
       ui.signIn(techEmail, password)
-      ui.waitForPath("/jobs")
-      ui.see("My jobs")
+      ui.waitForPath("/services/open")
+      ui.see("New services")
       ui.signOut()
       ui.signIn(advisorEmail, password)
-      ui.waitForPath("/staff/board")
+      ui.waitForPath("/staff/advisor-appointments")
+      ui.see("New appointments")
       ui.see("Saigon Moto Care – District 1")
       ui.signOut()
     }
@@ -112,7 +113,7 @@ class AdminSpec extends E2ESuite with CustomerSteps:
 
     it("its admin signs in to an empty workshop") {
       ui.signIn(dealerAdminEmail, password)
-      ui.waitForPath("/staff/board") // an admin starts where an advisor does
+      ui.waitForPath("/staff/board") // an admin starts on the workshop day board
       ui.see(dealership)
       ui.open("/admin")
       ui.see("Bays & team")

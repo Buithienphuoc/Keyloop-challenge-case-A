@@ -37,8 +37,8 @@ All demo accounts use the password **`Demo@2026`** in the dev profile (the login
 | Account | Role | Try this |
 | --- | --- | --- |
 | `customer@demo.vn` | Customer | Book maintenance; pick a time for the approved customisation request |
-| `advisor.d1@demo.vn` | Service advisor, District 1 | Workshop day board; review the waiting inspection request |
-| `tech.hung@demo.vn` | Technician, District 1 | Start and finish assigned jobs |
+| `advisor.d1@demo.vn` | Service advisor, District 1 | Take an open advisor appointment; assign a technician to a new service; workshop day board |
+| `tech.hung@demo.vn` | Technician, District 1 | Take an open service; start and finish your jobs |
 | `admin.d1@demo.vn` | Dealership admin, District 1 | Bays, technicians (skills and shifts), staff accounts |
 | `sysadmin@demo.vn` | System manager | Onboard a new dealership with its first admin; edit the service package catalogue |
 | `controller.d1@demo.vn` | Workshop controller, District 1 | Workload per bay and technician; move a job to another bay or technician |

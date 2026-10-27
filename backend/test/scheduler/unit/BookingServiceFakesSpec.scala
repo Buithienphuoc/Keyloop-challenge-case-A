@@ -74,6 +74,7 @@ class BookingServiceFakesSpec extends AnyFunSpec with Matchers:
       def recordEvent(s: DbSession, e: AppointmentEvent) = ()
       def expireHolds(s: DbSession, asOf: Instant, scope: HoldScope) = Nil
       def reassign(s: DbSession, id: String, bayId: String, technicianId: String) = ()
+      def markTechnicianAssigned(s: DbSession, id: String, by: String) = ()
 
     private val reader = new AppointmentReader:
       def get(s: DbSession, id: String) =
@@ -88,6 +89,7 @@ class BookingServiceFakesSpec extends AnyFunSpec with Matchers:
       def list(s: DbSession, filter: AppointmentFilter) = Nil
       def technicianIdForUser(s: DbSession, userId: String) = None
       def jobDetails(s: DbSession, id: String) = None
+      def technicianAccount(s: DbSession, technicianId: String) = None
 
     private val catalog = new CatalogReader:
       def listDealerships() = Seq(dealership)
