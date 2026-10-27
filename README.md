@@ -38,6 +38,7 @@ All demo accounts use the password **`Demo@2026`** in the dev profile (the login
 | --- | --- | --- |
 | `customer@demo.vn` | Customer | Book a service: vehicle, package, dealership and a free time; see it in My appointments |
 | `tech.hung@demo.vn` | Technician, District 1 | Service requests: start, finish and close your jobs |
+| `tech.minh`, `tech.lan`, `tech.khoa` (District 1), `tech.tam`, `tech.quan`, `tech.bao` (Thủ Đức) `@demo.vn` | Technician | Every seeded technician has a sign-in, so no name on screen lacks an account |
 | `sysadmin@demo.vn` | System manager | Sees everything: dealerships, All data (appointments, bays, technicians, vehicles), people, the package catalogue; onboard a dealership |
 
 The app has these three roles only, as the brief needs. Older staff accounts in the seed

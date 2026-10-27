@@ -227,6 +227,12 @@ object Seed:
     user("advisor.td@demo.vn", "Châu Mỹ Linh", "SERVICE_ADVISOR", Some(td))
     val hungUser = user("tech.hung@demo.vn", "Trần Quốc Hùng", "TECHNICIAN", Some(d1))
     val tamUser = user("tech.tam@demo.vn", "Võ Thanh Tâm", "TECHNICIAN", Some(td))
+    // Every seeded technician gets a sign-in, so each name on screen is a real account.
+    val minhUser = user("tech.minh@demo.vn", "Nguyễn Văn Minh", "TECHNICIAN", Some(d1))
+    val lanUser = user("tech.lan@demo.vn", "Lê Thị Lan", "TECHNICIAN", Some(d1))
+    val khoaUser = user("tech.khoa@demo.vn", "Phạm Đức Khoa", "TECHNICIAN", Some(d1))
+    val quanUser = user("tech.quan@demo.vn", "Đỗ Minh Quân", "TECHNICIAN", Some(td))
+    val baoUser = user("tech.bao@demo.vn", "Huỳnh Gia Bảo", "TECHNICIAN", Some(td))
 
     def tech(dealershipId: String, name: String, skills: Seq[String], start: String, end: String, days: Seq[Int],
         userId: Option[String] = None): Unit =
@@ -236,13 +242,13 @@ object Seed:
         RETURNING id""")
       for skill <- skills do SQL"INSERT INTO technician_skills VALUES ($techId::uuid, $skill)".execute()
 
-    tech(d1, "Nguyễn Văn Minh", Seq("GENERAL_SERVICE"), "08:00", "17:30", MonSat)
+    tech(d1, "Nguyễn Văn Minh", Seq("GENERAL_SERVICE"), "08:00", "17:30", MonSat, Some(minhUser))
     tech(d1, "Trần Quốc Hùng", Seq("GENERAL_SERVICE", "ENGINE", "ELECTRICAL"), "08:00", "17:30", MonSat, Some(hungUser))
-    tech(d1, "Lê Thị Lan", Seq("GENERAL_SERVICE", "BRAKES_SUSPENSION"), "08:00", "17:30", 1 to 5)
-    tech(d1, "Phạm Đức Khoa", Seq("CUSTOMISATION", "ELECTRICAL", "ENGINE"), "09:00", "17:30", 2 to 6)
+    tech(d1, "Lê Thị Lan", Seq("GENERAL_SERVICE", "BRAKES_SUSPENSION"), "08:00", "17:30", 1 to 5, Some(lanUser))
+    tech(d1, "Phạm Đức Khoa", Seq("CUSTOMISATION", "ELECTRICAL", "ENGINE"), "09:00", "17:30", 2 to 6, Some(khoaUser))
     tech(td, "Võ Thanh Tâm", Seq("GENERAL_SERVICE", "BRAKES_SUSPENSION"), "07:30", "16:00", MonSat, Some(tamUser))
-    tech(td, "Đỗ Minh Quân", Seq("GENERAL_SERVICE", "ENGINE"), "09:30", "18:00", 3 to 7)
-    tech(td, "Huỳnh Gia Bảo", Seq("GENERAL_SERVICE", "ELECTRICAL"), "07:30", "18:00", 1 to 5)
+    tech(td, "Đỗ Minh Quân", Seq("GENERAL_SERVICE", "ENGINE"), "09:30", "18:00", 3 to 7, Some(quanUser))
+    tech(td, "Huỳnh Gia Bảo", Seq("GENERAL_SERVICE", "ELECTRICAL"), "07:30", "18:00", 1 to 5, Some(baoUser))
 
     // The demo customer
     val tuan = user("customer@demo.vn", "Lê Minh Tuấn", "CUSTOMER", None, Some("0901 234 567"))
