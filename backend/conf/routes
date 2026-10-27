@@ -38,6 +38,7 @@ GET     /api/staff/consultations           scheduler.modules.consultation.adapte
 POST    /api/consultations/:id/review      scheduler.modules.consultation.adapters.ConsultationController.review(id: String)
 
 # ---- dealership administration ---------------------------------------------------------------
+GET     /api/admin/jobs                    scheduler.modules.scheduling.adapters.SchedulingController.dealershipJobs
 GET     /api/admin/bays                    scheduler.modules.admin.adapters.AdminController.listBays
 POST    /api/admin/bays                    scheduler.modules.admin.adapters.AdminController.addBay
 PATCH   /api/admin/bays/:id                scheduler.modules.admin.adapters.AdminController.setBayActive(id: String)

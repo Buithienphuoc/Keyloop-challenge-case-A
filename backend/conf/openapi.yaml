@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Unified Service Scheduler API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Book vehicle service appointments with real-time availability of **both** a service bay
     and a qualified technician for the whole job.
@@ -168,8 +168,11 @@ components:
         customerNote: { type: string, maxLength: 1000 }
     AppointmentStatus:
       type: string
-      enum: [HELD, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW, EXPIRED]
-      description: HELD is a short reservation waiting for the customer to confirm; EXPIRED is a hold that ran out.
+      enum: [HELD, CONFIRMED, IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW, EXPIRED]
+      description: >-
+        HELD is a short reservation waiting for the customer to confirm; EXPIRED is a hold that ran out.
+        AWAITING_PAYMENT is finished work the customer has checked; the dealership admin moves it to
+        COMPLETED once it has been paid.
     Appointment:
       type: object
       properties:
@@ -476,7 +479,10 @@ paths:
   /api/appointments/{id}/status:
     post:
       tags: [Staff]
-      summary: Move an appointment through its lifecycle (start, complete, no-show)
+      summary: Move an appointment through its lifecycle (start, finish → awaiting payment, paid → completed, no-show)
+      description: >-
+        IN_PROGRESS → AWAITING_PAYMENT by the technician, advisor or admin; AWAITING_PAYMENT → COMPLETED
+        by the dealership admin only (403 otherwise). A job may be started before its booked time.
       parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody:
         required: true
@@ -486,7 +492,7 @@ paths:
               type: object
               required: [status]
               properties:
-                status: { type: string, enum: [IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW] }
+                status: { type: string, enum: [IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW] }
                 reason: { type: string }
       responses:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
@@ -594,6 +600,14 @@ paths:
       responses:
         '200': { description: OK }
 
+  /api/admin/jobs:
+    get:
+      tags: [Admin]
+      summary: Every job of my dealership, newest first (holds being confirmed are left out)
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [CONFIRMED, IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW] } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Appointment' } } } } }
   /api/admin/bays:
     get: { tags: [Admin], summary: Service bays of my dealership, responses: { '200': { description: OK } } }
     post:

@@ -13,6 +13,20 @@ Entry format:
 
 ## Unreleased
 
+### #PR Awaiting payment step and the admin's job list (`feature/awaiting-payment`)
+- **Added:** a job now goes IN_PROGRESS → AWAITING_PAYMENT → COMPLETED. The technician or
+  advisor finishes it once the customer has checked the vehicle; only the dealership admin
+  closes it after the customer has paid ("Payment received"). There is no bank integration, so
+  the payment is recorded by hand.
+- **Added:** "Jobs & payments" for the dealership admin (`GET /api/admin/jobs`): every job,
+  newest first, with tabs for New, In progress, Awaiting payment, Finished and Cancelled &
+  missed.
+- **Changed:** customers see "Awaiting payment" with a note that the vehicle is ready, then
+  "Finished" (was "Done"). Staff may still start a job before its booked time (Q1, decided
+  27 October 2026).
+- **Upgrade notes:** migration V3 adds the status, keeps one live appointment per approved
+  request while it awaits payment, and adds an index on (dealership, status).
+
 ### #18 Azure setup uses a standard Container Apps environment (`fix/azure-standard-env`)
 - **Fixed:** the apps ran on an "express" Container Apps environment, which has no internal
   service discovery (the web app's nginx could not reach `scheduler-api` by name) and kept

@@ -19,6 +19,7 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
   ],
   ADMIN: [
     { to: '/staff/board', label: 'Workshop day' },
+    { to: '/admin/jobs', label: 'Jobs & payments' },
     { to: '/staff/requests', label: 'Advice requests' },
     { to: '/staff/workload', label: 'Workload' },
     { to: '/parts', label: 'Parts' },

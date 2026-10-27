@@ -12,9 +12,13 @@ class LifecycleSpec extends AnyFunSpec with Matchers:
   private val Start = 1_000_000L
 
   describe("appointment lifecycle") {
-    it("follows CONFIRMED → IN_PROGRESS → COMPLETED and allows no way back") {
+    it("follows CONFIRMED → IN_PROGRESS → AWAITING_PAYMENT → COMPLETED and allows no way back") {
       canTransition(CONFIRMED, IN_PROGRESS) shouldBe true
-      canTransition(IN_PROGRESS, COMPLETED) shouldBe true
+      canTransition(IN_PROGRESS, AWAITING_PAYMENT) shouldBe true
+      canTransition(AWAITING_PAYMENT, COMPLETED) shouldBe true
+      canTransition(IN_PROGRESS, COMPLETED) shouldBe false // payment comes first
+      canTransition(AWAITING_PAYMENT, IN_PROGRESS) shouldBe false
+      canTransition(AWAITING_PAYMENT, CANCELLED) shouldBe false
       canTransition(COMPLETED, IN_PROGRESS) shouldBe false
       canTransition(CANCELLED, CONFIRMED) shouldBe false
       canTransition(IN_PROGRESS, CANCELLED) shouldBe false // work has started
@@ -34,6 +38,19 @@ class LifecycleSpec extends AnyFunSpec with Matchers:
       checkTransition(CONFIRMED, IN_PROGRESS, Role.CUSTOMER, Start, Start) shouldBe Some(ROLE_NOT_ALLOWED)
       checkTransition(CONFIRMED, CANCELLED, Role.TECHNICIAN, Start, Start) shouldBe Some(ROLE_NOT_ALLOWED)
       checkTransition(CONFIRMED, IN_PROGRESS, Role.TECHNICIAN, Start, Start) shouldBe None
+    }
+
+    it("lets staff start a job before its booked time (the vehicle may arrive early)") {
+      checkTransition(CONFIRMED, IN_PROGRESS, Role.TECHNICIAN, Start, Start - 3 * 24 * 3600 * 1000L) shouldBe None
+      checkTransition(CONFIRMED, IN_PROGRESS, Role.SERVICE_ADVISOR, Start, Start - 1) shouldBe None
+    }
+
+    it("lets the people who did the work finish it, and only the dealership admin mark it paid") {
+      for role <- Seq(Role.TECHNICIAN, Role.SERVICE_ADVISOR, Role.ADMIN) do
+        checkTransition(IN_PROGRESS, AWAITING_PAYMENT, role, Start, Start) shouldBe None
+      checkTransition(AWAITING_PAYMENT, COMPLETED, Role.ADMIN, Start, Start) shouldBe None
+      for role <- Seq(Role.TECHNICIAN, Role.SERVICE_ADVISOR, Role.CUSTOMER, Role.WORKSHOP_CONTROLLER) do
+        checkTransition(AWAITING_PAYMENT, COMPLETED, role, Start, Start) shouldBe Some(ROLE_NOT_ALLOWED)
     }
 
     it("lets a hold be confirmed, released or time out, and nothing else") {

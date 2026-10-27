@@ -80,10 +80,11 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
 | --- | --- | --- | --- | --- |
 | UC30 Workshop day board | `GET /api/staff/appointments`, `/api/staff/resources` | Workshop day | `ApiSpec` › shows it everywhere it should | Done |
 | UC31 Review an advice request | `GET /api/staff/consultations`, `POST /api/consultations/:id/review` | Advice requests (staff) | `ApiSpec` › advisor turns it into a schedulable job | Done |
-| UC32 Record start, completion, no-show | `POST /api/appointments/:id/status` | Board side panel | `ApiSpec` › technician workflow, no-show only after start | Done |
+| UC32 Record start, finish, no-show | `POST /api/appointments/:id/status` | Board side panel | `ApiSpec` › technician workflow, no-show only after start | Done |
 | UC33 Cancel a booking | `POST /api/appointments/:id/cancel` | Board side panel | `ApiSpec` › UC33 | Done |
 | UC34 See the day's workload | `GET /api/staff/workload` | Workload | `FeaturesSpec` › workshop controller sees how loaded each technician and bay is; `WorkloadSpec` | Done |
 | UC35 Move a job | `POST /api/appointments/:id/reassign` | Workshop day › Move job | `FeaturesSpec` › moves a job to a free, qualified technician; never double-books | Done |
+| UC36 See every job by status and record payment | `GET /api/admin/jobs`, `POST /api/appointments/:id/status` (`COMPLETED`) | Jobs & payments | `ApiSpec` › works through it (only the admin closes a paid job); `WorkshopDaySpec` › records each payment | Done |
 | UC40 View my jobs | `GET /api/technician/jobs` | My jobs | `ApiSpec` › the technician sees the job | Done |
 | UC41 Start and finish a job | `POST /api/appointments/:id/status` | My jobs | `ApiSpec` › works through it; UC41 other technician's job → 403 | Done |
 | UC42 Order parts for a job | `POST /api/part-orders` | Parts › New order | `FeaturesSpec` › lets a technician order parts for a job | Done |

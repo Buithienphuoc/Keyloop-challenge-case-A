@@ -457,6 +457,7 @@ textarea.input {
   color: var(--go);
 }
 .pill-HELD,
+.pill-AWAITING_PAYMENT,
 .pill-ORDERED,
 .pill-REQUESTED {
   background: var(--hivis-tint);

@@ -6,8 +6,12 @@ enum VehicleType:
   case MOTORBIKE, CAR
 
 enum AppointmentStatus:
-  /** HELD: reserved for a few minutes while the customer confirms. EXPIRED: a hold that ran out. */
-  case HELD, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW, EXPIRED
+  /**
+   * HELD: reserved for a few minutes while the customer confirms. EXPIRED: a hold that ran out.
+   * AWAITING_PAYMENT: the work is done and the customer has checked the vehicle; the dealership
+   * marks it COMPLETED once it has been paid.
+   */
+  case HELD, CONFIRMED, IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW, EXPIRED
 
 object AppointmentStatus:
   /** Statuses in which an appointment still holds its bay, technician and vehicle. */

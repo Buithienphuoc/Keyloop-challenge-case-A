@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | 26 October 2026 |
 | Status | Delivered build `service-scheduler` 0.2.0 |
 | Readers | The client (dealership and platform owners) and future development teams |
@@ -149,7 +149,7 @@ test in the Test Specification.
 | --- | --- | --- | --- | --- | --- |
 | FR-30 | An advisor sees one day of the dealership as a board (bays × hours) with every job, and can move between days | UC30 | M | Done | TC-ADV-01 |
 | FR-31 | Selecting a job shows its details (customer and phone, vehicle, bay, technician, price, note, checklist) and only the actions its status allows | UC30 | M | Done | TC-ADV-02 |
-| FR-32 | An advisor records that work started, that it is done, or that the customer did not come (only after the start time) | UC32 | M | Done | TC-ADV-03 |
+| FR-32 | An advisor records that work started (at any time, also before the booked start), that it is finished once the customer has checked the vehicle (the job then awaits payment), or that the customer did not come (only after the start time) | UC32 | M | Done | TC-ADV-03 |
 | FR-33 | An advisor can cancel a booking before work starts | UC33 | M | Done | TC-ADV-04 |
 | FR-34 | An advisor reviews advice requests of the dealership: approve with duration, skill, bay type (compatible with the vehicle), optional estimate and message; or decline with a reason of at least 5 characters | UC31 | M | Done | TC-ADV-05, 06 |
 | FR-35 | An advisor, technician, workshop controller or admin can order replacement parts, optionally for a booked job of the dealership | UC42 | S | Done | `FeaturesSpec` › replacement parts; e2e `BookingJourneySpec` |
@@ -159,7 +159,7 @@ test in the Test Specification.
 | ID | Requirement | UC | Priority | Status | Test |
 | --- | --- | --- | --- | --- | --- |
 | FR-40 | A technician sees their own jobs for a day, with the checklist and the customer's note | UC40 | M | Done | TC-TEC-01 |
-| FR-41 | A technician starts and finishes their own jobs; they cannot move another technician's jobs | UC41 | M | Done | TC-TEC-02 |
+| FR-41 | A technician starts and finishes their own jobs (finishing puts the job in Awaiting payment); they cannot move another technician's jobs | UC41 | M | Done | TC-TEC-02 |
 
 ### 3.4a Workshop controller
 
@@ -184,6 +184,7 @@ test in the Test Specification.
 | FR-52 | An admin adds technicians with skills, shift times, working days and an optional login, and deactivates or reactivates them | UC51 | M | Partial (no edit of an existing technician) | TC-ADM-03 |
 | FR-53 | An admin creates staff accounts (service advisor, admin, workshop controller or parts staff) for their dealership | UC52 | S | Partial (no deactivate or password reset) | TC-ADM-04 |
 | FR-54 | An admin sets opening and closing time, open days, slot size, minimum lead time and booking horizon. New bookings follow them at once; existing bookings are kept and the admin is told how many now fall outside the hours | UC53 | S | Done | `FeaturesSpec` › opening hours; e2e `BackOfficeSpec` |
+| FR-55 | An admin sees every job of the dealership, newest first, by status (New, In progress, Awaiting payment, Finished, Cancelled & missed) and records that a finished job has been paid, which closes it (Awaiting payment → Finished). Only the admin may close a job; the customer then sees it as Finished. There is no bank integration: the payment is recorded by hand | UC36 | M | Done | `ApiSpec` › technician works through it; e2e `WorkshopDaySpec` › records each payment |
 
 ### 3.6 System manager
 
@@ -201,8 +202,8 @@ test in the Test Specification.
 | BR-02 | A job is only offered when a bay of the required type and a technician with the required skill, on shift on that weekday, are free for the whole duration | `domain/Availability.scala` |
 | BR-03 | Best fit: among free technicians, the one with the fewest skills is chosen; ties go to the one with the least booked minutes that day. Specialists stay free for work only they can do | `Availability.allocate` |
 | BR-04 | A start time must be on an open day, on the slot grid, inside opening hours, at least `min_lead_minutes` ahead and at most `max_days_ahead` days ahead; the job must end by closing | `Availability.validateStart` (called by `BookingService`), the same rules in the slot grid |
-| BR-05 | Lifecycle: Held → Confirmed (by the customer, before the hold runs out); Held → Cancelled (released) or Expired (ran out); Confirmed → In the workshop → Done; Confirmed → Cancelled (before work starts); Confirmed → Missed (no-show, only after the start). No way back from Done, Cancelled, Missed or Expired | `domain/Lifecycle.scala`, `AppointmentService.confirmHold` |
-| BR-06 | A customer may only confirm and cancel; a technician may only start and finish their own jobs; advisors and admins may do all four staff moves at their dealership; workshop controllers, parts staff and the system manager may not change a status | `Lifecycle.roleMayMoveTo`, `AppointmentService` |
+| BR-05 | Lifecycle: Held → Confirmed (by the customer, before the hold runs out); Held → Cancelled (released) or Expired (ran out); Confirmed → In the workshop (at any time: the vehicle may arrive early) → Awaiting payment → Finished; Confirmed → Cancelled (before work starts); Confirmed → Missed (no-show, only after the start). No way back from Finished, Cancelled, Missed or Expired | `domain/Lifecycle.scala`, `AppointmentService.confirmHold` |
+| BR-06 | A customer may only confirm and cancel; a technician may only start and finish their own jobs; advisors may start, finish, cancel and record a no-show at their dealership; only the admin records a payment (Awaiting payment → Finished); workshop controllers, parts staff and the system manager may not change a status | `Lifecycle.roleMayMoveTo`, `AppointmentService` |
 | BR-07 | An appointment is either for a package or for an approved advice request, never both. One advice request has at most one live booking | Database `CHECK` and partial unique index |
 | BR-08 | Cancelling the appointment of an advice request, or its hold expiring, re-opens the request, so the customer can pick another time | `AppointmentService`, `HoldSweeper`, `expireHolds` |
 | BR-09 | An approved advice request must carry duration, skill and bay type, and the bay type must accept the vehicle type | Database `CHECK`; `ConsultationService.review` |
@@ -275,7 +276,7 @@ ISO-8601 with offset. The full contract with request and response schemas is ser
 | GET | `/api/me/appointments` | Own appointments | Customer |
 | GET | `/api/appointments/:id` | One appointment | Owner, staff of its dealership |
 | POST | `/api/appointments/:id/cancel` | Cancel | Customer (own, before start), advisor, admin |
-| POST | `/api/appointments/:id/status` | Start, finish, no-show | Advisor, admin, technician (own) |
+| POST | `/api/appointments/:id/status` | Start, finish (→ awaiting payment), no-show; payment received (→ completed) by the admin only | Advisor, admin, technician (own) |
 | GET | `/api/staff/appointments` | One day at the dealership | Advisor, admin, workshop controller |
 | GET | `/api/staff/workload` | Booked minutes per bay and technician for a day | Workshop controller, advisor, admin |
 | GET | `/api/staff/resources` | Active bays and technicians | Advisor, admin, workshop controller |
@@ -286,6 +287,7 @@ ISO-8601 with offset. The full contract with request and response schemas is ser
 | POST | `/api/consultations/:id/cancel` | Withdraw | Customer (own) |
 | GET | `/api/staff/consultations` | The dealership's advice requests | Advisor, admin |
 | POST | `/api/consultations/:id/review` | Approve or decline | Advisor, admin |
+| GET | `/api/admin/jobs` | Every job of the dealership, newest first, optionally one `status` | Admin |
 | GET, POST | `/api/admin/bays` | List or add bays | Admin |
 | PATCH | `/api/admin/bays/:id` | Put in or out of service | Admin |
 | GET, POST | `/api/admin/technicians` | List or add technicians | Admin |

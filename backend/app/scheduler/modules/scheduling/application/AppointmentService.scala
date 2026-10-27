@@ -47,6 +47,14 @@ final class AppointmentService(
     val (from, to) = LocalDay.bounds(date, workshop.dealership(dealershipId).timezone)
     db.run(reader.list(_, AppointmentFilter(dealershipId = Some(dealershipId), from = Some(from), to = Some(to))))
 
+  /**
+   * Every job of the admin's dealership, newest first, optionally in one status: what is new,
+   * in the workshop, waiting to be paid and finished. Holds still being confirmed are left out.
+   */
+  def listDealershipJobs(auth: AuthContext, status: Option[AppointmentStatus]): Seq[AppointmentView] =
+    val statuses = status.fold(AppointmentStatus.values.toSet - AppointmentStatus.HELD)(Set(_))
+    db.run(reader.list(_, AppointmentFilter(dealershipId = Some(auth.requireDealership), statuses = statuses, newestFirst = true)))
+
   /** The signed-in technician's jobs for one local day. */
   def listTechnicianDay(auth: AuthContext, date: LocalDate): Seq[AppointmentView] = db.run { s =>
     (reader.technicianIdForUser(s, auth.userId), auth.dealershipId) match

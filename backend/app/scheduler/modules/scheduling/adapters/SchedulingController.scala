@@ -67,6 +67,10 @@ final class SchedulingController(
     json()(appointments.listForDealershipDay(req.auth, query[DayQuery](req).date))
   }
 
+  def dealershipJobs: Action[AnyContent] = guard(ADMIN).async { req =>
+    json()(appointments.listDealershipJobs(req.auth, query[JobsQuery](req).status))
+  }
+
   def technicianDay: Action[AnyContent] = guard(TECHNICIAN).async { req =>
     json()(appointments.listTechnicianDay(req.auth, query[DayQuery](req).date))
   }

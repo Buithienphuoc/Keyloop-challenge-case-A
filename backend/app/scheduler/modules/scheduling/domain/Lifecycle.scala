@@ -6,19 +6,22 @@ import AppointmentStatus.*
 /**
  * Appointment lifecycle.
  *
- *   HELD ──confirm──▶ CONFIRMED ──start──▶ IN_PROGRESS ──finish──▶ COMPLETED
+ *   HELD ──confirm──▶ CONFIRMED ──start──▶ IN_PROGRESS ──finish──▶ AWAITING_PAYMENT ──paid──▶ COMPLETED
  *    │                    │
  *    ├──release──▶ CANCELLED ◀──cancel──┤  (only before work starts)
  *    └──time out─▶ EXPIRED              └──no-show─▶ NO_SHOW  (only once the start time has passed)
  *
  * A hold is confirmed through its own endpoint (it has an expiry check); time-outs are
- * applied by the system, never by a person.
+ * applied by the system, never by a person. Staff may start a job before its booked time
+ * (the vehicle can arrive early). Finishing the work means the customer has checked the
+ * vehicle; only the dealership admin, who takes the payment, closes the job.
  */
 object Lifecycle:
   private val Transitions: Map[AppointmentStatus, Set[AppointmentStatus]] = Map(
     HELD -> Set(CONFIRMED, CANCELLED, EXPIRED),
     CONFIRMED -> Set(IN_PROGRESS, CANCELLED, NO_SHOW),
-    IN_PROGRESS -> Set(COMPLETED),
+    IN_PROGRESS -> Set(AWAITING_PAYMENT),
+    AWAITING_PAYMENT -> Set(COMPLETED),
     COMPLETED -> Set.empty,
     CANCELLED -> Set.empty,
     NO_SHOW -> Set.empty,
@@ -30,9 +33,9 @@ object Lifecycle:
   /** Which roles may move an appointment into which status (ownership is checked separately). */
   private val AllowedByRole: Map[Role, Set[AppointmentStatus]] = Map(
     Role.CUSTOMER -> Set(CONFIRMED, CANCELLED),
-    Role.SERVICE_ADVISOR -> Set(IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW),
-    Role.ADMIN -> Set(IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW),
-    Role.TECHNICIAN -> Set(IN_PROGRESS, COMPLETED),
+    Role.SERVICE_ADVISOR -> Set(IN_PROGRESS, AWAITING_PAYMENT, CANCELLED, NO_SHOW),
+    Role.ADMIN -> Set(IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW),
+    Role.TECHNICIAN -> Set(IN_PROGRESS, AWAITING_PAYMENT),
     Role.WORKSHOP_CONTROLLER -> Set.empty,
     Role.PARTS_STAFF -> Set.empty,
     Role.SYSTEM_MANAGER -> Set.empty

@@ -241,11 +241,23 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
 
       def move(to: String) = post(s"/api/appointments/$appointmentId/status", techHung, Json.obj("status" -> to))
       move("IN_PROGRESS").str("status") shouldBe "IN_PROGRESS"
-      move("COMPLETED").str("status") shouldBe "COMPLETED"
+      move("COMPLETED").errorCode shouldBe "INVALID_STATUS_TRANSITION" // payment comes first
+      move("AWAITING_PAYMENT").str("status") shouldBe "AWAITING_PAYMENT"
+      move("COMPLETED").status shouldBe 403 // only the dealership admin takes the payment
       move("IN_PROGRESS").status shouldBe 409
 
+      get("/api/admin/jobs?status=AWAITING_PAYMENT", adminD1).ids should contain(appointmentId)
+      get("/api/admin/jobs?status=CONFIRMED", adminD1).ids should not contain appointmentId
+      get("/api/admin/jobs", advisorD1).status shouldBe 403
+      get("/api/admin/jobs?status=HELD", adminD1).status shouldBe 400
+
+      val paid = post(s"/api/appointments/$appointmentId/status", adminD1, Json.obj("status" -> "COMPLETED", "reason" -> "Paid at the desk"))
+      paid.str("status") shouldBe "COMPLETED"
+      get("/api/me/appointments", customer).json.as[Seq[JsObject]].find(o => (o \ "id").as[String] == appointmentId)
+        .map(o => (o \ "status").as[String]) shouldBe Some("COMPLETED")
+
       h.sql(SQL"SELECT to_status FROM appointment_events WHERE appointment_id = $appointmentId::uuid ORDER BY id"
-        .as(SqlParser.scalar[String].*)) shouldBe Seq("CONFIRMED", "IN_PROGRESS", "COMPLETED")
+        .as(SqlParser.scalar[String].*)) shouldBe Seq("CONFIRMED", "IN_PROGRESS", "AWAITING_PAYMENT", "COMPLETED")
       h.clock.set(Now)
     }
 

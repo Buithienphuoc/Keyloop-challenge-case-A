@@ -78,10 +78,11 @@ function JobCard({ j, date }: { j: Appointment; date: string }) {
           </button>
         )}
         {j.status === 'IN_PROGRESS' && (
-          <button className="btn btn-primary btn-block" disabled={move.isPending} onClick={() => move.mutate('COMPLETED')}>
-            Job done
+          <button className="btn btn-primary btn-block" disabled={move.isPending} onClick={() => move.mutate('AWAITING_PAYMENT')}>
+            Customer checked the vehicle, finish job
           </button>
         )}
+        {j.status === 'AWAITING_PAYMENT' && <p className="muted small">Finished. The dealership closes the job once the customer has paid.</p>}
       </div>
     </article>
   );
