@@ -118,7 +118,13 @@ class AdminServicesSpec extends AnyFunSpec with Matchers:
     }
 
     it("needs an account attached to a dealership") {
-      (the[AppError] thrownBy Fixture().service.listBays(auth(Role.SYSTEM_MANAGER, dealershipId = None))).status shouldBe 403
+      (the[AppError] thrownBy Fixture().service.listBays(auth(Role.ADMIN, dealershipId = None))).status shouldBe 403
+    }
+
+    it("lets the system manager read the bays of a dealership it names, and only one it names") {
+      val sys = auth(Role.SYSTEM_MANAGER, dealershipId = None)
+      (the[AppError] thrownBy Fixture().service.listBays(sys)).code shouldBe "DEALERSHIP_REQUIRED"
+      noException should be thrownBy Fixture().service.listBays(sys, Some("d1"))
     }
   }
 
