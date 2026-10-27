@@ -109,6 +109,26 @@ export interface Appointment {
   createdAt: string;
   /** Only while HELD: when the hold runs out unless the customer confirms. */
   holdExpiresAt: string | null;
+  /** False while the service job is open: no technician has taken it yet (the one shown is only reserved). */
+  technicianAssigned: boolean;
+}
+
+export type AdvisorAppointmentStatus = 'SCHEDULED' | 'DONE' | 'CANCELLED';
+
+/** A meeting with a service advisor. Not a service job: no vehicle, bay or technician. */
+export interface AdvisorAppointment {
+  id: string;
+  reference: string;
+  status: AdvisorAppointmentStatus;
+  start: string;
+  dealership: { id: string; name: string; address: string; timezone: string };
+  customer: { id: string; fullName: string; phone: string | null; email: string };
+  /** What the customer wants to be advised about. */
+  message: string;
+  /** Empty while the appointment is open. */
+  advisor: { id: string; name: string } | null;
+  cancelReason: string | null;
+  createdAt: string;
 }
 
 export interface Consultation {

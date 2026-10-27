@@ -13,6 +13,25 @@ Entry format:
 
 ## Unreleased
 
+### #23 Separate service jobs from advisor appointments (`feature/services-and-advisor-appointments`)
+- **Added:** an **appointment** is now a meeting with a service advisor: customer, time,
+  workshop, the message to be advised and the advisor. Customers book one under "Meet an
+  advisor"; it starts open, and an advisor takes it ("Take this appointment") and marks it done.
+  API: `/api/advisor-appointments` (book, take, complete, cancel) and
+  `GET /api/staff/advisor-appointments?open=true|date=…`.
+- **Changed:** a booked job is a **service** (customer, time, workshop, technician). Booking still
+  reserves a qualified, free technician so nothing can be double-booked, but the job stays
+  **open** until a technician takes it for themselves or an advisor assigns one
+  (`POST /api/appointments/{id}/technician`, `GET /api/staff/open-services`). An advisor cannot
+  assign themselves or another advisor; a technician can only take open jobs, and only for
+  themselves. Jobs have `technicianAssigned` in the API.
+- **Changed:** after signing in, a technician lands on "New services" (open jobs) and an advisor
+  on "New appointments" (open advisor appointments).
+- **Tests:** assignment rules (unit), open services and advisor appointments end to end, and V4
+  on a database holding V3 data.
+- **Upgrade notes:** migration V4 is additive. It adds `technician_assigned_at` /
+  `technician_assigned_by` to `appointments` and marks every existing job as assigned (so prod
+  jobs keep their technician and do not reappear as open), and creates `advisor_appointments`.
 ### #22 New bookings show on the advisor's board (`fix/advisor-board-upcoming`)
 - **Fixed:** a booking made by a customer seemed missing for the advisor. The board opens on
   today, and customers can only book from a little ahead (usually the next working day), so the

@@ -122,7 +122,8 @@ class BookingJourneySpec extends E2ESuite:
     it("finds the new booking on the workshop day board") {
       val ref = needsBooking()
       ui.signIn("advisor.d1@demo.vn")
-      ui.waitForPath("/staff/board")
+      ui.waitForPath("/staff/advisor-appointments")
+      ui.open("/staff/board")
       ui.goToDay(day)
       ui.click(boardJob)
       ui.see(ref)
@@ -181,7 +182,8 @@ class BookingJourneySpec extends E2ESuite:
     it("sees the job in My jobs and requests a part for it") {
       needsBooking()
       ui.signIn("tech.hung@demo.vn")
-      ui.waitForPath("/jobs")
+      ui.waitForPath("/services/open")
+      ui.open("/jobs")
       ui.goToDay(day)
       val card = ui.visible(By.xpath(s"//article[contains(@class,'job-card') and .//*[normalize-space(.)=${Ui.literal(plate)}]]"))
       card.getText should include("Essential maintenance")

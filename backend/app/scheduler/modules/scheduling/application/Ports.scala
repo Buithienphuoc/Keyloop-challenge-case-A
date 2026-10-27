@@ -4,7 +4,7 @@ import java.time.{Instant, ZonedDateTime}
 
 import scheduler.modules.catalog.Money
 import scheduler.modules.consultation.BookableConsultation
-import scheduler.modules.scheduling.domain.{AppointmentStatus, Bay, BusyPeriod, Requirement, Technician, VehicleType}
+import scheduler.modules.scheduling.domain.{AppointmentStatus, Bay, BusyPeriod, Requirement, Technician, TechnicianAssignment, VehicleType}
 import scheduler.shared.DbSession
 
 /** Read model returned by the API. */
@@ -25,7 +25,12 @@ final case class AppointmentView(
     cancelReason: Option[String],
     createdAt: Instant,
     /** Only while HELD: when the hold runs out unless the customer confirms. */
-    holdExpiresAt: Option[Instant] = None
+    holdExpiresAt: Option[Instant] = None,
+    /**
+     * False while the service job is open: the technician is only reserved by the booking and
+     * nobody has taken the job yet (a technician taking it, or an advisor assigning one).
+     */
+    technicianAssigned: Boolean = true
 )
 
 object AppointmentView:
@@ -57,7 +62,9 @@ final case class NewAppointment(
     idempotencyKey: Option[String],
     createdBy: String,
     status: AppointmentStatus = AppointmentStatus.CONFIRMED,
-    holdExpiresAt: Option[Instant] = None
+    holdExpiresAt: Option[Instant] = None,
+    /** Customer bookings start open (false); staff-made or migrated jobs may already be assigned. */
+    technicianAssigned: Boolean = false
 )
 
 final case class AppointmentFilter(
@@ -69,6 +76,8 @@ final case class AppointmentFilter(
     /** Empty = every status (EXPIRED holds are never listed). */
     statuses: Set[AppointmentStatus] = Set.empty,
     newestFirst: Boolean = false,
+    /** Only service jobs nobody has taken yet. */
+    openOnly: Boolean = false,
     limit: Int = 1000
 )
 
@@ -115,7 +124,8 @@ final case class JobDetails(
     end: Instant,
     bayId: String,
     technicianId: String,
-    requirement: Requirement
+    requirement: Requirement,
+    technicianAssigned: Boolean = true
 )
 
 // ---- persistence ports, split by who uses them (ISP) ----------------------------------------
@@ -133,6 +143,8 @@ trait AppointmentReader:
   def list(s: DbSession, filter: AppointmentFilter): Seq[AppointmentView]
   def technicianIdForUser(s: DbSession, userId: String): Option[String]
   def jobDetails(s: DbSession, id: String): Option[JobDetails]
+  /** The account a technician profile signs in with, if it has one. */
+  def technicianAccount(s: DbSession, technicianId: String): Option[TechnicianAssignment.Account]
 
 /** Writing appointments. */
 trait AppointmentWriter:
@@ -160,6 +172,9 @@ trait AppointmentWriter:
 
   /** Moves a job to another bay and/or technician. Throws SlotTakenError when either is busy then. */
   def reassign(s: DbSession, id: String, bayId: String, technicianId: String): Unit
+
+  /** Marks the job's technician as taken for good (no longer an open job). */
+  def markTechnicianAssigned(s: DbSession, id: String, by: String): Unit
 
 /** The whole store, as implemented by the PostgreSQL adapter. */
 trait SchedulingStore extends ResourceCalendar, AppointmentReader, AppointmentWriter
