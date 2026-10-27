@@ -38,11 +38,9 @@ class DoubleSubmitSpec extends E2ESuite with CustomerSteps:
 
   private def normalNetwork(): Unit = scala.util.Try(ui.driver.asInstanceOf[ChromiumDriver].deleteNetworkConditions())
 
-  /** Book page up to a picked time on `day` for the motorbike `plate`. */
-  private def upToTime(day: java.time.LocalDate, plate: String): String =
+  /** Book page up to a picked time on `day`. The customer has one motorbike, so the vehicle step is skipped. */
+  private def upToTime(day: java.time.LocalDate): String =
     ui.open("/book")
-    ui.see("Which vehicle?")
-    ui.click(vehicleChoice(plate))
     ui.see("What should we do?")
     ui.click(ui.containing("button", "Essential maintenance"))
     ui.clickButton("Choose a time")
@@ -64,7 +62,7 @@ class DoubleSubmitSpec extends E2ESuite with CustomerSteps:
       fillVehicle("Honda", "Lead", bike)
       ui.see(bike)
 
-      upToTime(day, bike)
+      upToTime(day)
       slowNetwork(1500)
       try
         clickTimes(ui.visible(ui.button("Hold this time and review")), 5)

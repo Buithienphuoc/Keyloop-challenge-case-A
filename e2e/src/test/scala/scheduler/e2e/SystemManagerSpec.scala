@@ -22,6 +22,7 @@ class SystemManagerSpec extends E2ESuite:
 
     it("sees the bays and technicians of a dealership") {
       tab("Bays & technicians")
+      ui.select("Dealership").selectByVisibleText("Saigon Moto Care – District 1")
       ui.see("Stand A")
       ui.see("Diagnostic 1")
       ui.see("Trần Quốc Hùng")
