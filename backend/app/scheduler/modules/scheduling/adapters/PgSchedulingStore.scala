@@ -8,7 +8,8 @@ import anorm.SqlParser.scalar
 
 import scheduler.modules.catalog.Money
 import scheduler.modules.scheduling.application.*
-import scheduler.modules.scheduling.domain.{AppointmentStatus, Bay, BusyPeriod, Requirement, Technician, VehicleType}
+import scheduler.modules.identity.Role
+import scheduler.modules.scheduling.domain.{AppointmentStatus, Bay, BusyPeriod, Requirement, Technician, TechnicianAssignment, VehicleType}
 import scheduler.shared.{DbSession, PgErrors, Sql}
 import scheduler.shared.Sql.*
 
@@ -17,7 +18,7 @@ final class PgSchedulingStore extends SchedulingStore:
 
   private val ViewSelect = """
     SELECT a.id, a.reference, a.status, lower(a.period) AS start_at, upper(a.period) AS end_at,
-           a.customer_note, a.cancel_reason, a.created_at, a.hold_expires_at,
+           a.customer_note, a.cancel_reason, a.created_at, a.hold_expires_at, a.technician_assigned_at,
            d.id AS d_id, d.name AS d_name, d.address AS d_address, d.phone AS d_phone, d.timezone AS d_tz,
            v.id AS v_id, v.vehicle_type, v.make, v.model, v.plate,
            u.id AS u_id, u.full_name AS u_name, u.phone AS u_phone, u.email AS u_email,
@@ -65,7 +66,8 @@ final class PgSchedulingStore extends SchedulingStore:
       customerNote = r.strOpt("customer_note"),
       cancelReason = r.strOpt("cancel_reason"),
       createdAt = r.instant("created_at"),
-      holdExpiresAt = if r.str("status") == "HELD" then r.instantOpt("hold_expires_at") else None
+      holdExpiresAt = if r.str("status") == "HELD" then r.instantOpt("hold_expires_at") else None,
+      technicianAssigned = r.instantOpt("technician_assigned_at").isDefined
     )
   }
 
@@ -100,10 +102,11 @@ final class PgSchedulingStore extends SchedulingStore:
       SQL"""
         INSERT INTO appointments (reference, dealership_id, customer_id, vehicle_id, service_package_id,
           consultation_request_id, bay_id, technician_id, period, status, customer_note, idempotency_key, created_by,
-          hold_expires_at)
+          hold_expires_at, technician_assigned_at, technician_assigned_by)
         VALUES (${a.reference}, ${a.dealershipId}::uuid, ${a.customerId}::uuid, ${a.vehicleId}::uuid, ${a.servicePackageId}::uuid,
           ${a.consultationRequestId}::uuid, ${a.bayId}::uuid, ${a.technicianId}::uuid, tstzrange(${ts(a.start)}, ${ts(a.end)}, '[)'),
-          ${a.status.toString}, ${a.customerNote}, ${a.idempotencyKey}, ${a.createdBy}::uuid, ${a.holdExpiresAt.map(ts)})
+          ${a.status.toString}, ${a.customerNote}, ${a.idempotencyKey}, ${a.createdBy}::uuid, ${a.holdExpiresAt.map(ts)},
+          CASE WHEN ${a.technicianAssigned} THEN now() END, CASE WHEN ${a.technicianAssigned} THEN ${a.createdBy}::uuid END)
         RETURNING id""".as(scalar[java.util.UUID].single).toString
     catch
       // Translate database outcomes into the port's errors, so use cases never see SQL codes.
@@ -154,6 +157,7 @@ final class PgSchedulingStore extends SchedulingStore:
         AND (CAST({from} AS timestamptz) IS NULL OR upper(a.period) > CAST({from} AS timestamptz))
         AND (CAST({to} AS timestamptz) IS NULL OR lower(a.period) < CAST({to} AS timestamptz))
         AND ({anyStatus} OR a.status = ANY({statuses}))
+        AND (NOT {openOnly} OR a.technician_assigned_at IS NULL)
       ORDER BY lower(a.period) ${if f.newestFirst then "DESC" else "ASC"}
       LIMIT {limit}""")
       .on(
@@ -164,6 +168,7 @@ final class PgSchedulingStore extends SchedulingStore:
         "to" -> f.to.map(ts),
         "anyStatus" -> f.statuses.isEmpty,
         "statuses" -> textArray(f.statuses.toSeq.map(_.toString)),
+        "openOnly" -> f.openOnly,
         "limit" -> f.limit
       )
       .as(view.*)
@@ -201,10 +206,16 @@ final class PgSchedulingStore extends SchedulingStore:
     given java.sql.Connection = Sql.connection(s)
     SQL"SELECT id FROM technicians WHERE user_id = $userId::uuid".as(scalar[java.util.UUID].singleOpt).map(_.toString)
 
+  def technicianAccount(s: DbSession, technicianId: String): Option[TechnicianAssignment.Account] =
+    given java.sql.Connection = Sql.connection(s)
+    SQL"SELECT u.id, u.role FROM technicians t JOIN users u ON u.id = t.user_id WHERE t.id = $technicianId::uuid"
+      .as(Sql.rows(r => TechnicianAssignment.Account(r.uuid("id"), Role.valueOf(r.str("role")))).singleOpt)
+
   def jobDetails(s: DbSession, id: String): Option[JobDetails] =
     given java.sql.Connection = Sql.connection(s)
     SQL"""
       SELECT a.id, a.dealership_id, a.status, lower(a.period) AS s, upper(a.period) AS e, a.bay_id, a.technician_id,
+             a.technician_assigned_at,
              COALESCE(sp.required_skill, cr.required_skill) AS skill, COALESCE(sp.bay_type, cr.bay_type) AS bay_type
       FROM appointments a
       LEFT JOIN service_packages sp ON sp.id = a.service_package_id
@@ -219,7 +230,8 @@ final class PgSchedulingStore extends SchedulingStore:
         end = end,
         bayId = r.uuid("bay_id"),
         technicianId = r.uuid("technician_id"),
-        requirement = Requirement(((end.toEpochMilli - start.toEpochMilli) / 60_000).toInt, r.str("skill"), r.str("bay_type"))
+        requirement = Requirement(((end.toEpochMilli - start.toEpochMilli) / 60_000).toInt, r.str("skill"), r.str("bay_type")),
+        technicianAssigned = r.instantOpt("technician_assigned_at").isDefined
       )
     }.singleOpt)
 
@@ -258,3 +270,9 @@ final class PgSchedulingStore extends SchedulingStore:
             WHERE id = $id::uuid""".executeUpdate()
       ()
     catch case e: SQLException if PgErrors.sqlState(e).contains(PgErrors.ExclusionViolation) => throw SlotTakenError()
+
+  def markTechnicianAssigned(s: DbSession, id: String, by: String): Unit =
+    given java.sql.Connection = Sql.connection(s)
+    SQL"""UPDATE appointments SET technician_assigned_at = now(), technician_assigned_by = $by::uuid, updated_at = now()
+          WHERE id = $id::uuid""".executeUpdate()
+    ()

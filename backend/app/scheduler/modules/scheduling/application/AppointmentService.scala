@@ -35,9 +35,19 @@ final class AppointmentService(
   def get(auth: AuthContext, id: String): AppointmentView = db.run { s =>
     val view = reader.get(s, id).getOrElse(throw AppError.notFound("Appointment"))
     assertCanSee(auth, view.customer.id, view.dealership.id, "Appointment")
-    if !isOwnJobOrNotTechnician(s, auth, view.technician.id) then throw AppError.notFound("Appointment")
+    // A technician sees their own jobs, and the open ones they could take.
+    if view.technicianAssigned && !isOwnJobOrNotTechnician(s, auth, view.technician.id) then throw AppError.notFound("Appointment")
     view
   }
+
+  /**
+   * Service jobs of the caller's dealership that nobody has taken yet, soonest first: the
+   * technician's first screen (jobs to take) and the advisor's list of jobs to assign.
+   */
+  def listOpenServices(auth: AuthContext): Seq[AppointmentView] =
+    val filter = AppointmentFilter(dealershipId = Some(auth.requireDealership), from = Some(clock()),
+      statuses = Set(AppointmentStatus.CONFIRMED), openOnly = true)
+    db.run(reader.list(_, filter))
 
   def listMine(auth: AuthContext): Seq[AppointmentView] = db.run(reader.list(_, AppointmentFilter(customerId = Some(auth.userId))))
 

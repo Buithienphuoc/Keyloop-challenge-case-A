@@ -43,8 +43,8 @@ class AuthSpec extends E2ESuite:
 
   describe("Each role lands on its own start page") {
     val starts = Seq(
-      "advisor.d1@demo.vn" -> "/staff/board",
-      "tech.hung@demo.vn" -> "/jobs",
+      "advisor.d1@demo.vn" -> "/staff/advisor-appointments",
+      "tech.hung@demo.vn" -> "/services/open",
       "controller.d1@demo.vn" -> "/staff/board",
       "parts.d1@demo.vn" -> "/parts",
       "sysadmin@demo.vn" -> "/system"

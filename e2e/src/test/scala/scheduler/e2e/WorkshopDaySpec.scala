@@ -107,7 +107,8 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
     it("starts and finishes their own job from My jobs") {
       ref("technician")
       ui.signIn("tech.hung@demo.vn")
-      ui.waitForPath("/jobs")
+      ui.waitForPath("/services/open")
+      ui.open("/jobs")
       ui.goToDay(days(1))
       val card = By.xpath(s"//article[contains(@class,'job-card') and .//*[normalize-space(.)=${Ui.literal(plates("technician"))}]]")
       ui.visible(card).getText should include("Essential maintenance")

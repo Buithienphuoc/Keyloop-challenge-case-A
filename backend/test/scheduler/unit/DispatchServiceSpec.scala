@@ -5,7 +5,7 @@ import java.time.{Instant, LocalDate, LocalTime}
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 
-import scheduler.modules.identity.Role
+import scheduler.modules.identity.{AuthContext, Role}
 import scheduler.modules.scheduling.application.*
 import scheduler.modules.scheduling.domain.*
 import scheduler.shared.{AppError, Log}
@@ -27,15 +27,27 @@ class DispatchServiceSpec extends AnyFunSpec with Matchers:
   private val requirement = Requirement(60, "GENERAL_SERVICE", "MOTORBIKE_STAND")
 
   private final class Fixture(status: AppointmentStatus = AppointmentStatus.CONFIRMED, technicians: Seq[Technician] =
-      Seq(tech("t1"), tech("t2"), tech("t3", skills = Seq("ENGINE")), tech("t4", from = 13))):
-    val store = FakeStore(bays = Seq(stand1, stand2, lift), technicians = technicians)
+      Seq(tech("t1"), tech("t2"), tech("t3", skills = Seq("ENGINE")), tech("t4", from = 13)), assigned: Boolean = true):
+    // Technician accounts: t1 and t2 sign in as technicians u-t1 and u-t2; t3 belongs to an advisor's account.
+    val store = FakeStore(bays = Seq(stand1, stand2, lift), technicians = technicians,
+      technicianUsers = Map("u-t1" -> "t1", "u-t2" -> "t2", "u-t3" -> "t3", "u-adv" -> "t9"),
+      technicianAccounts = Map(
+        "t1" -> TechnicianAssignment.Account("u-t1", Role.TECHNICIAN),
+        "t2" -> TechnicianAssignment.Account("u-t2", Role.TECHNICIAN),
+        "t3" -> TechnicianAssignment.Account("u-t3", Role.TECHNICIAN),
+        "t5" -> TechnicianAssignment.Account("u-adv2", Role.SERVICE_ADVISOR),
+        "t9" -> TechnicianAssignment.Account("u-adv", Role.SERVICE_ADVISOR)
+      ))
     store.add(LockedAppointment("a1", status, JobStart, "d1", "u1", "t1", None))
-    store.jobs("a1") = JobDetails("a1", "d1", status, JobStart, JobStart.plusSeconds(3600), "b1", "t1", requirement)
+    store.jobs("a1") = JobDetails("a1", "d1", status, JobStart, JobStart.plusSeconds(3600), "b1", "t1", requirement, assigned)
     val consultations = FakeConsultations()
     val service = DispatchService(FakeDb(), store, store, store, consultations, WorkshopContext(FakeCatalog(), consultations), () => Now)
 
     def move(bay: Option[String] = None, technician: Option[String] = None, reason: Option[String] = None) =
       service.reassign(controller, "a1", Reassignment(bay, technician, reason), Log.silent)
+
+    def assign(by: AuthContext, technician: Option[String] = None) =
+      service.assignTechnician(by, "a1", TechnicianAssignmentRequest(technician), Log.silent)
 
   private def codeOf(f: => Any): String = (the[AppError] thrownBy f).code
 
@@ -54,6 +66,7 @@ class DispatchServiceSpec extends AnyFunSpec with Matchers:
       f.move(technician = Some("t2"))
       f.store.reassigned.toSeq shouldBe Seq(("a1", "b1", "t2"))
       f.store.events.head.note shouldBe Some("Moved: technician Tech t1 → Tech t2")
+      f.store.assignedBy.toSeq shouldBe Seq("a1" -> "u1") // a technician chosen by the controller has taken the job
     }
 
     it("first releases expired holds around the job and reopens their consultations") {
@@ -99,6 +112,88 @@ class DispatchServiceSpec extends AnyFunSpec with Matchers:
     it("answers 404 for an unknown appointment") {
       val f = Fixture()
       (the[AppError] thrownBy f.service.reassign(controller, "zzz", Reassignment(Some("b2"), None, None), Log.silent)).status shouldBe 404
+    }
+  }
+
+  describe("assignTechnician") {
+    val techT1 = auth(Role.TECHNICIAN, userId = "u-t1")
+    val techT2 = auth(Role.TECHNICIAN, userId = "u-t2")
+    val advisor = auth(Role.SERVICE_ADVISOR, userId = "u-adv")
+
+    it("lets a technician take an open job that was provisionally theirs, without moving it") {
+      val f = Fixture(assigned = false)
+      f.assign(techT1)
+      f.store.reassigned shouldBe empty
+      f.store.assignedBy.toSeq shouldBe Seq("a1" -> "u-t1")
+      f.store.events.head.note shouldBe Some("Assigned: technician Tech t1")
+    }
+
+    it("lets a technician take an open job reserved for someone else, which moves it to them") {
+      val f = Fixture(assigned = false)
+      f.assign(techT2)
+      f.store.reassigned.toSeq shouldBe Seq(("a1", "b1", "t2"))
+      f.store.assignedBy.toSeq shouldBe Seq("a1" -> "u-t2")
+      f.store.events.head.note shouldBe Some("Assigned: technician Tech t1 → Tech t2")
+    }
+
+    it("refuses a technician putting someone else on a job") {
+      (the[AppError] thrownBy Fixture(assigned = false).assign(techT1, Some("t2"))).status shouldBe 403
+    }
+
+    it("refuses a technician account without a technician profile") {
+      (the[AppError] thrownBy Fixture(assigned = false).assign(auth(Role.TECHNICIAN, userId = "u-nobody"))).status shouldBe 403
+    }
+
+    it("still checks the technician's skill and shift") {
+      codeOf(Fixture(assigned = false).assign(auth(Role.TECHNICIAN, userId = "u-t3"))) shouldBe "TECHNICIAN_NOT_QUALIFIED"
+    }
+
+    it("answers ALREADY_ASSIGNED when the technician already has the job") {
+      codeOf(Fixture().assign(techT1)) shouldBe "ALREADY_ASSIGNED"
+    }
+
+    it("does not let a technician take a job someone else has already taken") {
+      codeOf(Fixture().assign(techT2)) shouldBe "ALREADY_TAKEN"
+    }
+
+    it("lets an advisor move a taken job to another technician") {
+      val f = Fixture()
+      f.assign(advisor, Some("t2"))
+      f.store.reassigned.toSeq shouldBe Seq(("a1", "b1", "t2"))
+    }
+
+    it("lets an advisor assign a technician") {
+      val f = Fixture(assigned = false)
+      f.assign(advisor, Some("t2"))
+      f.store.reassigned.toSeq shouldBe Seq(("a1", "b1", "t2"))
+      f.store.assignedBy.toSeq shouldBe Seq("a1" -> "u-adv")
+    }
+
+    it("lets an advisor confirm the provisional technician") {
+      val f = Fixture(assigned = false)
+      f.assign(advisor, Some("t1"))
+      f.store.reassigned shouldBe empty
+      f.store.assignedBy.toSeq shouldBe Seq("a1" -> "u-adv")
+    }
+
+    it("refuses an advisor assigning themselves or another advisor") {
+      codeOf(Fixture(assigned = false).assign(advisor, Some("t9"))) shouldBe "CANNOT_ASSIGN_SELF"
+      codeOf(Fixture(assigned = false).assign(advisor, Some("t5"))) shouldBe "NOT_A_TECHNICIAN"
+    }
+
+    it("needs the advisor to say which technician") {
+      codeOf(Fixture(assigned = false).assign(advisor)) shouldBe "TECHNICIAN_REQUIRED"
+    }
+
+    it("only assigns confirmed jobs") {
+      codeOf(Fixture(status = AppointmentStatus.IN_PROGRESS, assigned = false).assign(techT2)) shouldBe "NOT_REASSIGNABLE"
+    }
+
+    it("answers RESOURCE_BUSY when the technician has another job then") {
+      val f = Fixture(assigned = false)
+      f.store.reassignFails = true
+      codeOf(f.assign(techT2)) shouldBe "RESOURCE_BUSY"
+      f.store.assignedBy shouldBe empty
     }
   }
 

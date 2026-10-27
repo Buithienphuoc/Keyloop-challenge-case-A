@@ -9,9 +9,12 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
     { to: '/book', label: 'Book a service' },
     { to: '/appointments', label: 'My appointments' },
     { to: '/requests', label: 'Advice requests' },
+    { to: '/advisor', label: 'Meet an advisor' },
     { to: '/vehicles', label: 'My vehicles' },
   ],
   SERVICE_ADVISOR: [
+    { to: '/staff/advisor-appointments', label: 'Appointments' },
+    { to: '/services/open', label: 'New services' },
     { to: '/staff/board', label: 'Workshop day' },
     { to: '/staff/requests', label: 'Advice requests' },
     { to: '/staff/workload', label: 'Workload' },
@@ -19,6 +22,7 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
   ],
   ADMIN: [
     { to: '/staff/board', label: 'Workshop day' },
+    { to: '/staff/advisor-appointments', label: 'Appointments' },
     { to: '/admin/jobs', label: 'Jobs & payments' },
     { to: '/staff/requests', label: 'Advice requests' },
     { to: '/staff/workload', label: 'Workload' },
@@ -32,6 +36,7 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
   ],
   PARTS_STAFF: [{ to: '/parts', label: 'Parts orders & stock' }],
   TECHNICIAN: [
+    { to: '/services/open', label: 'New services' },
     { to: '/jobs', label: 'My jobs' },
     { to: '/parts', label: 'Parts' },
   ],

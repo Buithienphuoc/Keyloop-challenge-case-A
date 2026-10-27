@@ -277,6 +277,17 @@ object Seed:
 
     bookSomeDemoAppointments(s, d1, others, now)
 
+    // Two meetings with an advisor that no advisor has taken yet (the advisor's first screen).
+    val nextDay = Iterator.iterate(now.atZone(Zone).toLocalDate.plusDays(1))(_.plusDays(1)).find(_.getDayOfWeek != DayOfWeek.SUNDAY).get
+    for (hour, message) <- Seq(
+        15 -> "My Exciter's chain is noisy. Is it time to replace the chain and sprockets, or just adjust them?",
+        16 -> "I would like advice on which maintenance package fits a car that mostly drives in the city.")
+    do
+      SQL"""
+        INSERT INTO advisor_appointments (reference, dealership_id, customer_id, starts_at, message, status, created_by)
+        VALUES (${Ids.humanReference("AP")}, $d1::uuid, $tuan::uuid, ${ts(nextDay.atTime(hour, 0).atZone(Zone).toInstant)},
+          $message, 'SCHEDULED', $tuan::uuid)""".execute()
+
   /** Fills part of the next open day at District 1 (one hour fully booked) so availability looks real. */
   private def bookSomeDemoAppointments(s: DbSession, dealershipId: String, vehicleIds: Seq[String], now: Instant): Unit =
     given Connection = Sql.connection(s)

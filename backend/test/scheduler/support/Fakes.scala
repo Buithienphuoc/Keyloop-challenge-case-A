@@ -86,6 +86,7 @@ object Fakes:
       var technicians: Seq[Technician] = Nil,
       var busy: Seq[BusyPeriod] = Nil,
       technicianUsers: Map[String, String] = Map.empty, // user id -> technician id
+      var technicianAccounts: Map[String, TechnicianAssignment.Account] = Map.empty, // technician id -> account
       var expiredHolds: Seq[ExpiredHold] = Nil,
       var reassignFails: Boolean = false
   ) extends ResourceCalendar, AppointmentReader, AppointmentWriter:
@@ -94,6 +95,7 @@ object Fakes:
     val statusChanges = mutable.Buffer.empty[(String, AppointmentStatus, Option[String])]
     val events = mutable.Buffer.empty[AppointmentEvent]
     val reassigned = mutable.Buffer.empty[(String, String, String)]
+    val assignedBy = mutable.Buffer.empty[(String, String)]
     val holdScopes = mutable.Buffer.empty[HoldScope]
     val busyQueries = mutable.Buffer.empty[(Instant, Instant)]
     var lastFilter: Option[AppointmentFilter] = None
@@ -116,6 +118,7 @@ object Fakes:
       Nil
     def technicianIdForUser(s: DbSession, userId: String): Option[String] = technicianUsers.get(userId)
     def jobDetails(s: DbSession, id: String): Option[JobDetails] = jobs.get(id)
+    def technicianAccount(s: DbSession, technicianId: String): Option[TechnicianAssignment.Account] = technicianAccounts.get(technicianId)
 
     // AppointmentWriter
     def insert(s: DbSession, a: NewAppointment): String = throw UnsupportedOperationException("not used here")
@@ -135,3 +138,6 @@ object Fakes:
       if reassignFails then throw SlotTakenError()
       reassigned += ((id, bayId, technicianId))
       jobs.updateWith(id)(_.map(_.copy(bayId = bayId, technicianId = technicianId)))
+    def markTechnicianAssigned(s: DbSession, id: String, by: String): Unit =
+      assignedBy += ((id, by))
+      jobs.updateWith(id)(_.map(_.copy(technicianAssigned = true)))
