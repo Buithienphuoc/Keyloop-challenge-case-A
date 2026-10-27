@@ -13,7 +13,7 @@ Entry format:
 
 ## Unreleased
 
-### #PR Separate service jobs from advisor appointments (`feature/services-and-advisor-appointments`)
+### #23 Separate service jobs from advisor appointments (`feature/services-and-advisor-appointments`)
 - **Added:** an **appointment** is now a meeting with a service advisor: customer, time,
   workshop, the message to be advised and the advisor. Customers book one under "Meet an
   advisor"; it starts open, and an advisor takes it ("Take this appointment") and marks it done.
