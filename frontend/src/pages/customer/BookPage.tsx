@@ -2,8 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useReducer } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { get } from '../../api/client';
-import { useDealerships, usePackages, useVehicles } from '../../api/hooks';
+import { useBusyVehicles, useDealerships, usePackages, useVehicles } from '../../api/hooks';
 import type { Availability, Consultation, Slot } from '../../api/types';
+import { BusyNote } from '../../components/BusyVehicle';
 import { Ticket } from '../../components/Ticket';
 import { ErrorNote, Loading } from '../../components/ui';
 import { duration, todayIn, vehicleName } from '../../lib/format';
@@ -40,6 +41,7 @@ export function BookPage() {
   const vehicles = useVehicles();
   const packages = usePackages();
   const dealerships = useDealerships();
+  const allBusy = useBusyVehicles();
   const request = useQuery({
     queryKey: ['consultation', requestId],
     queryFn: () => get<Consultation>(`/api/consultations/${requestId}`),
@@ -89,6 +91,11 @@ export function BookPage() {
     { dealershipId: w.dealershipId, vehicleId: w.vehicleId, packageId: w.packageId, consultationRequestId: consult?.id ?? null, note: w.note },
     w.slot?.start,
   );
+
+  // A vehicle with a live appointment is booked again only once that one is cancelled or
+  // done (the server refuses it too). This page's own hold does not count.
+  const busy = new Map([...allBusy].filter(([, a]) => !booking.isMine(a.id)));
+  const blockedBy = w.vehicleId ? busy.get(w.vehicleId) : undefined;
 
   const placeHold = (s: Slot) => {
     dispatch({ type: 'goTo', step: 'confirm' });
@@ -171,17 +178,34 @@ export function BookPage() {
 
       <div className="book">
         <section className="panel" aria-live="polite">
+          {blockedBy && w.step !== 'vehicle' && (
+            <div className="stack">
+              <h2>This vehicle already has an appointment</h2>
+              <div className="notice notice-info" role="status">
+                <BusyNote appointment={blockedBy} />
+              </div>
+              {!consult && (vehicles.data?.length ?? 0) > 1 && (
+                <div className="nav-buttons">
+                  <button className="btn" onClick={() => go('vehicle')}>
+                    Choose another vehicle
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {w.step === 'vehicle' && (
             <VehicleStep
               vehicles={vehicles.data ?? []}
               vehicleId={w.vehicleId}
+              busy={busy}
               adding={w.addingVehicle}
               onAdding={(adding) => dispatch({ type: 'setAddingVehicle', adding })}
               onChoose={(vehicleId) => dispatch({ type: 'chooseVehicle', vehicleId })}
             />
           )}
 
-          {w.step === 'service' && vehicle && (
+          {!blockedBy && w.step === 'service' && vehicle && (
             <ServiceStep
               vehicle={vehicle}
               packages={fitsPackages}
@@ -193,7 +217,7 @@ export function BookPage() {
             />
           )}
 
-          {w.step === 'time' && (
+          {!blockedBy && w.step === 'time' && (
             <TimeStep
               choosePlace={!consult}
               dealerships={dealerships.data ?? []}
@@ -215,7 +239,7 @@ export function BookPage() {
             />
           )}
 
-          {w.step === 'confirm' && w.slot && (
+          {!blockedBy && w.step === 'confirm' && w.slot && (
             <ConfirmStep
               slot={w.slot}
               diagnosticBay={consult?.bayType === 'DIAGNOSTIC_BAY'}

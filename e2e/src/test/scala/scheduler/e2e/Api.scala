@@ -71,9 +71,15 @@ object Api:
       .find(s => field(s, "start").toString.contains(s"T$hhmm"))
       .getOrElse(throw IllegalStateException(s"no $hhmm slot on $day"))
 
-  /** Holds a time for this customer's first vehicle; returns the held appointment's id. */
+  /**
+   * Holds `start` for a new motorbike of this account and returns the held appointment's id.
+   * A new one because a vehicle with a live appointment cannot be held again, and the demo
+   * accounts' own bikes may already be booked.
+   */
   def hold(api: Api, dealershipId: String, packageId: String, start: String): String =
-    val vehicle = list(api.get("/api/me/vehicles")).head
+    val n = System.nanoTime()
+    val plate = f"59-Z9 ${n / 1000 % 1000}%03d.${n % 100}%02d"
+    val vehicle = api.post("/api/me/vehicles", Map("vehicleType" -> "MOTORBIKE", "make" -> "Honda", "model" -> "Wave", "plate" -> plate))
     val held = api.post("/api/appointments/holds",
       Map("dealershipId" -> dealershipId, "vehicleId" -> field(vehicle, "id"), "start" -> start, "packageId" -> packageId),
       "Idempotency-Key" -> UUID.randomUUID().toString)

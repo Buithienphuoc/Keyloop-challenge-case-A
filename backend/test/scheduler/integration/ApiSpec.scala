@@ -137,10 +137,12 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       get(s"/api/appointments/$appointmentId", nosy).status shouldBe 404
     }
 
-    it("refuses to book the same vehicle twice at overlapping times") {
+    it("refuses a second booking for a vehicle that already has one, and names the first") {
       val res = book(customer, "dealershipId" -> d1, "vehicleId" -> airBlade, "packageId" -> essential, "start" -> s"${Wed}T09:30:00+07:00")
       res.status shouldBe 409
-      res.errorCode shouldBe "VEHICLE_ALREADY_BOOKED"
+      res.errorCode shouldBe "VEHICLE_HAS_APPOINTMENT"
+      (res.json \ "error" \ "details" \ "status").as[String] shouldBe "CONFIRMED"
+      (res.json \ "error" \ "details" \ "start").as[String] shouldBe s"${Wed}T09:00:00.000+07:00"
     }
 
     it("answers a taken slot with the nearest free alternatives") {

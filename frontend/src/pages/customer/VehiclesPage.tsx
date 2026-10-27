@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useVehicles } from '../../api/hooks';
+import { useBusyVehicles, useVehicles } from '../../api/hooks';
+import { BusyNote } from '../../components/BusyVehicle';
 import { Empty, ErrorNote, Loading, PageHead, Plate } from '../../components/ui';
 import { VehicleForm } from '../../components/VehicleForm';
 import { vehicleName } from '../../lib/format';
 
 export function VehiclesPage() {
   const vehicles = useVehicles();
+  const busy = useBusyVehicles();
   const [adding, setAdding] = useState(false);
 
   return (
@@ -34,25 +36,35 @@ export function VehiclesPage() {
         </Empty>
       )}
       <div className="list">
-        {vehicles.data?.map((v) => (
-          <div className="item" key={v.id}>
-            <Plate text={v.plate} />
-            <div>
-              <strong>{vehicleName(v)}</strong>
-              <div className="meta">
-                {v.vehicleType === 'MOTORBIKE' ? 'Motorbike' : 'Car'}
-                {v.year ? ` · ${v.year}` : ''}
-                {v.mileageKm !== null ? ` · ${v.mileageKm.toLocaleString('en-GB')} km` : ''}
-                {v.vin ? ` · VIN ${v.vin}` : ''}
+        {vehicles.data?.map((v) => {
+          const taken = busy.get(v.id);
+          return (
+            <div className="item" key={v.id}>
+              <Plate text={v.plate} />
+              <div>
+                <strong>{vehicleName(v)}</strong>
+                <div className="meta">
+                  {v.vehicleType === 'MOTORBIKE' ? 'Motorbike' : 'Car'}
+                  {v.year ? ` · ${v.year}` : ''}
+                  {v.mileageKm !== null ? ` · ${v.mileageKm.toLocaleString('en-GB')} km` : ''}
+                  {v.vin ? ` · VIN ${v.vin}` : ''}
+                </div>
+                {taken && <BusyNote appointment={taken} />}
+              </div>
+              <div className="actions">
+                {taken ? (
+                  <button className="btn btn-sm btn-primary" disabled>
+                    Book a service
+                  </button>
+                ) : (
+                  <Link className="btn btn-sm btn-primary" to={`/book?vehicle=${v.id}`}>
+                    Book a service
+                  </Link>
+                )}
               </div>
             </div>
-            <div className="actions">
-              <Link className="btn btn-sm btn-primary" to={`/book?vehicle=${v.id}`}>
-                Book a service
-              </Link>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

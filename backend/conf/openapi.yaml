@@ -397,7 +397,8 @@ paths:
       description: |
         The server picks the bay and technician. Double booking is impossible: the database rejects
         overlapping bookings of the same bay, technician or vehicle, and the server retries with the
-        next free pair when it loses a race.
+        next free pair when it loses a race. A vehicle has at most one live appointment (on hold,
+        booked or in the workshop): it is booked again only once that one is cancelled or done.
 
         Send an `Idempotency-Key` header to make retries safe: repeating a request with the same key
         returns the original appointment (200, header `Idempotent-Replayed: true`) instead of booking twice.
@@ -408,7 +409,7 @@ paths:
         '201': { description: Booked, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
         '200': { description: Replay of an earlier request with the same Idempotency-Key }
         '409':
-          description: SLOT_UNAVAILABLE (details.alternatives holds the nearest free slots), VEHICLE_ALREADY_BOOKED or CONSULTATION_NOT_BOOKABLE
+          description: SLOT_UNAVAILABLE (details.alternatives holds the nearest free slots), VEHICLE_HAS_APPOINTMENT (details.reference, status and start name the vehicle's live appointment), VEHICLE_ALREADY_BOOKED or CONSULTATION_NOT_BOOKABLE
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
         '422': { description: 'Start time breaks a workshop rule (TOO_SOON, OUTSIDE_OPENING_HOURS, …), the package does not fit the vehicle, or NOT_OFFERED_HERE (no bay or technician for this job at the dealership)' }
   /api/appointments/holds:
@@ -424,7 +425,7 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookRequest' } } } }
       responses:
         '201': { description: Held, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
-        '409': { description: As for booking, e.g. SLOT_UNAVAILABLE with alternatives }
+        '409': { description: 'As for booking: SLOT_UNAVAILABLE with alternatives, or VEHICLE_HAS_APPOINTMENT while the vehicle has another hold or booking' }
   /api/appointments/{id}/confirm:
     post:
       tags: [Booking]

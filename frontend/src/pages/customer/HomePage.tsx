@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { useMyAppointments, useMyRequests, usePackages, useVehicles } from '../../api/hooks';
+import { useBusyVehicles, useMyAppointments, useMyRequests, usePackages, useVehicles } from '../../api/hooks';
+import { BusyNote } from '../../components/BusyVehicle';
 import { useAuth } from '../../auth/AuthContext';
 import { Plate, StatusPill } from '../../components/ui';
 import { dt, duration, time, vehicleName } from '../../lib/format';
@@ -10,6 +11,7 @@ export function HomePage() {
   const packages = usePackages();
   const appointments = useMyAppointments();
   const requests = useMyRequests();
+  const busy = useBusyVehicles();
 
   const firstName = user?.fullName.trim().split(/\s+/).at(-1) ?? '';
   const mainType = vehicles.data?.[0]?.vehicleType ?? 'MOTORBIKE';
@@ -35,10 +37,17 @@ export function HomePage() {
               <strong>{r.advisorName ?? 'An advisor'} has replied to your request {r.reference}.</strong> It takes about{' '}
               {duration(r.durationMinutes ?? 60)} at {r.dealership.name}.
             </span>
-            <Link className="btn btn-primary btn-sm" to={`/book?request=${r.id}`}>
-              Pick a time
-            </Link>
+            {busy.has(r.vehicle.id) ? (
+              <button className="btn btn-primary btn-sm" disabled>
+                Pick a time
+              </button>
+            ) : (
+              <Link className="btn btn-primary btn-sm" to={`/book?request=${r.id}`}>
+                Pick a time
+              </Link>
+            )}
           </div>
+          {busy.get(r.vehicle.id) && <BusyNote appointment={busy.get(r.vehicle.id)!} />}
         </div>
       ))}
 

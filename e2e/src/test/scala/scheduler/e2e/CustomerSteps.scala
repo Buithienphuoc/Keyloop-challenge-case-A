@@ -74,12 +74,19 @@ trait CustomerSteps:
     ui.step(s"booked $ref")
     ref
 
+  /** The vehicle step's choice for `plate`. */
+  protected def vehicleChoice(plate: String): By =
+    By.xpath(s"//button[contains(@class,'choice') and .//*[normalize-space(.)=${Ui.literal(plate)}]]")
+
   /**
-   * Books Essential maintenance at District 1 on `day` for a customer with one motorbike
-   * (the booking page then skips the vehicle step). Returns the reference.
+   * Books Essential maintenance at District 1 on `day` and returns the reference. Without a
+   * plate the customer has one motorbike, and the booking page skips the vehicle step.
    */
-  protected def bookEssential(day: LocalDate): String =
+  protected def bookEssential(day: LocalDate, plate: String = ""): String =
     ui.open("/book")
+    if plate.nonEmpty then
+      ui.see("Which vehicle?")
+      ui.click(vehicleChoice(plate))
     ui.see("What should we do?")
     ui.click(ui.containing("button", "Essential maintenance"))
     ui.clickButton("Choose a time")

@@ -85,7 +85,7 @@ export function PackagesPage() {
                       >
                         Price
                       </button>{' '}
-                      <button className="btn btn-sm" onClick={() => update.mutate({ id: p.id, changes: { isActive: !p.isActive } })}>
+                      <button className="btn btn-sm" disabled={update.isPending} onClick={() => update.mutate({ id: p.id, changes: { isActive: !p.isActive } })}>
                         {p.isActive ? 'Retire' : 'Bring back'}
                       </button>
                     </td>
