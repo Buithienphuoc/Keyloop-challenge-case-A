@@ -82,6 +82,14 @@ class AppointmentServiceSpec extends AnyFunSpec with Matchers:
       f.service.listMine(customer)
       f.store.lastFilter shouldBe Some(AppointmentFilter(customerId = Some("u1")))
     }
+
+    it("lists the admin's dealership jobs newest first, in one status or in all but HELD") {
+      val f = Fixture(locked(CONFIRMED))
+      f.service.listDealershipJobs(auth(Role.ADMIN), Some(AWAITING_PAYMENT))
+      f.store.lastFilter shouldBe Some(AppointmentFilter(dealershipId = Some("d1"), statuses = Set(AWAITING_PAYMENT), newestFirst = true))
+      f.service.listDealershipJobs(auth(Role.ADMIN), None)
+      f.store.lastFilter.get.statuses shouldBe AppointmentStatus.values.toSet - HELD
+    }
   }
 
   describe("changeStatus") {

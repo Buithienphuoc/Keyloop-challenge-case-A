@@ -6,7 +6,10 @@ import org.openqa.selenium.By
  * The workshop day activity diagram (activity-workshop-day.puml) and the appointment
  * lifecycle (state-appointment.puml): the advisor starts and finishes one job from the board
  * (UC32), the assigned technician starts and finishes another from My jobs (UC40, UC41), the
- * advisor cancels a third (UC33), and no-show is not offered before the start time.
+ * advisor cancels a third (UC33), and no-show is not offered before the start time. Both
+ * finished jobs wait for payment until the dealership admin records it (UC36); only then
+ * does the customer see them as finished. The jobs are started days before their booked
+ * time, which is allowed (the vehicle can arrive early).
  * Three bookings on three quiet weekdays, so they never compete with each other.
  */
 class WorkshopDaySpec extends E2ESuite with CustomerSteps:
@@ -51,14 +54,14 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
       ui.all(ui.button("Customer did not come")) shouldBe empty
     }
 
-    it("starts the job when the vehicle arrives, then marks it done") {
+    it("starts the job when the vehicle arrives, then finishes it once the customer has checked it") {
       ref("advisor")
       ui.clickButton("Vehicle arrived, start work")
       ui.eventually("the job is in the workshop") { panelStatus == "In the workshop" }
       ui.all(ui.button("Cancel booking")) shouldBe empty // no cancelling once work has started
-      ui.clickButton("Mark as done")
-      ui.eventually("the job is done") { panelStatus == "Done" }
-      ui.all(By.cssSelector("aside button.btn-primary")) shouldBe empty // nothing follows Done
+      ui.clickButton("Customer checked the vehicle, finish job")
+      ui.eventually("the job waits for payment") { panelStatus == "Awaiting payment" }
+      ui.all(By.cssSelector("aside button.btn-primary")) shouldBe empty // only the admin records the payment
     }
 
     it("cancels a booking before work starts") {
@@ -101,21 +104,58 @@ class WorkshopDaySpec extends E2ESuite with CustomerSteps:
       ui.visible(card).getText should include("Essential maintenance")
       ui.click(ui.visible(card).findElement(By.xpath(".//button[normalize-space(.)='Start job']")))
       ui.eventually("the job is in the workshop") { ui.visible(card).getText.contains("In the workshop") }
-      ui.click(ui.visible(card).findElement(By.xpath(".//button[normalize-space(.)='Job done']")))
-      ui.eventually("the job is done") { ui.visible(card).getText.contains("Done") }
+      ui.click(ui.visible(card).findElement(By.xpath(".//button[normalize-space(.)='Customer checked the vehicle, finish job']")))
+      ui.eventually("the job waits for payment") { ui.visible(card).getText.contains("Awaiting payment") }
       ui.visible(card).findElements(By.tagName("button")) shouldBe empty
       ui.signOut()
     }
   }
 
+  describe("Customer, before paying (UC08)") {
+    it("sees both finished jobs waiting for payment, ready to collect") {
+      ui.signIn(email, password)
+      ui.open("/appointments")
+      for key <- Seq("advisor", "technician") do
+        val row = ui.visible(appointmentRow(ref(key)))
+        row.getText should include("Awaiting payment")
+        row.getText should include("Your vehicle is ready")
+        row.findElements(By.xpath(".//button[normalize-space(.)='Cancel']")) shouldBe empty
+      ui.signOut()
+    }
+  }
+
+  describe("Dealership admin, at the desk (UC36)") {
+    def jobRow(r: String) = By.cssSelector(s"[data-job='$r']")
+
+    it("sees both jobs under Awaiting payment and records each payment") {
+      ui.signIn("admin.d1@demo.vn")
+      ui.open("/admin/jobs")
+      for key <- Seq("advisor", "technician") do
+        val r = ref(key)
+        val row = ui.visible(jobRow(r))
+        row.getText should include("Awaiting payment")
+        ui.click(row.findElement(By.xpath(".//button[normalize-space(.)='Payment received']")))
+        ui.click(ui.visible(jobRow(r)).findElement(By.xpath(".//button[starts-with(normalize-space(.),'Yes,')]")))
+        ui.eventually(s"$r leaves Awaiting payment") { ui.all(jobRow(r)).isEmpty }
+    }
+
+    it("finds them under Finished, with every other status one tab away") {
+      ui.click(By.xpath("//button[@role='tab' and starts-with(normalize-space(.),'Finished')]"))
+      for key <- Seq("advisor", "technician") do ui.visible(jobRow(ref(key))).getText should include("Finished")
+      ui.click(By.xpath("//button[@role='tab' and starts-with(normalize-space(.),'Cancelled')]"))
+      ui.visible(By.xpath(s"//*[@data-job and contains(normalize-space(.), ${Ui.literal(plate)})]")).getText should include("Cancelled")
+      ui.signOut()
+    }
+  }
+
   describe("Customer, afterwards (UC08)") {
-    it("sees the two finished jobs as done and the third as cancelled, none of them cancellable") {
+    it("sees the two paid jobs as finished and the third as cancelled, none of them cancellable") {
       ui.signIn(email, password)
       ui.open("/appointments")
       ui.see("Past and cancelled")
       for key <- Seq("advisor", "technician") do
         val row = ui.visible(appointmentRow(ref(key)))
-        row.getText should include("Done")
+        row.getText should include("Finished")
         row.findElements(By.xpath(".//button[normalize-space(.)='Cancel']")) shouldBe empty
       ui.all(By.xpath("//div[contains(@class,'item') and contains(normalize-space(.), 'Cancelled')]")) should not be empty
       ui.signOut()

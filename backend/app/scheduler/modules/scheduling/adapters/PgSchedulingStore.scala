@@ -137,13 +137,18 @@ final class PgSchedulingStore extends SchedulingStore:
         AND (CAST({technicianId} AS uuid) IS NULL OR a.technician_id = CAST({technicianId} AS uuid))
         AND (CAST({from} AS timestamptz) IS NULL OR upper(a.period) > CAST({from} AS timestamptz))
         AND (CAST({to} AS timestamptz) IS NULL OR lower(a.period) < CAST({to} AS timestamptz))
-      ORDER BY lower(a.period)""")
+        AND ({anyStatus} OR a.status = ANY({statuses}))
+      ORDER BY lower(a.period) ${if f.newestFirst then "DESC" else "ASC"}
+      LIMIT {limit}""")
       .on(
         "customerId" -> f.customerId,
         "dealershipId" -> f.dealershipId,
         "technicianId" -> f.technicianId,
         "from" -> f.from.map(ts),
-        "to" -> f.to.map(ts)
+        "to" -> f.to.map(ts),
+        "anyStatus" -> f.statuses.isEmpty,
+        "statuses" -> textArray(f.statuses.toSeq.map(_.toString)),
+        "limit" -> f.limit
       )
       .as(view.*)
 

@@ -16,10 +16,11 @@ rectangle "Unified Service Scheduler" {
   usecase "UC02 Sign in / sign out" as UC02
   usecase "UC30 View the workshop day board" as UC30
   usecase "UC31 Review an advice request\n(approve with duration, skill, bay type,\nestimate — or decline)" as UC31
-  usecase "UC32 Record start, completion, no-show" as UC32
+  usecase "UC32 Record start, finish, no-show" as UC32
   usecase "UC33 Cancel a booking" as UC33
   usecase "UC34 See the day's workload\nper bay and technician" as UC34
   usecase "UC35 Move a job to another\nbay or technician" as UC35
+  usecase "UC36 See every job by status\nand record payment" as UC36
   usecase "UC40 View my jobs" as UC40
   usecase "UC41 Start and finish a job" as UC41
   usecase "UC42 Order parts for a job" as UC42
@@ -55,6 +56,7 @@ Controller -- UC34
 Controller -- UC35
 Controller -- UC42
 Admin -- UC35
+Admin -- UC36
 Admin -- UC50
 Admin -- UC51
 Admin -- UC52

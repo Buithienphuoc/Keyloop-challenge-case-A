@@ -12,7 +12,10 @@ export function AppointmentsPage() {
   const appointments = useMyAppointments();
   const now = Date.now();
   const all = appointments.data ?? [];
-  const upcoming = all.filter((a) => ['HELD', 'CONFIRMED', 'IN_PROGRESS'].includes(a.status) && Date.parse(a.end) > now);
+  // A job in the workshop or waiting to be paid stays on top even if it ran past its booked time.
+  const upcoming = all.filter(
+    (a) => ['IN_PROGRESS', 'AWAITING_PAYMENT'].includes(a.status) || (['HELD', 'CONFIRMED'].includes(a.status) && Date.parse(a.end) > now),
+  );
   const past = all.filter((a) => !upcoming.includes(a)).reverse();
 
   return (
@@ -85,6 +88,9 @@ function AppointmentItem({ a, past = false }: { a: Appointment; past?: boolean }
         </div>
         {a.status === 'HELD' && a.holdExpiresAt && (
           <div className="meta">Reserved until {timeIn(a.holdExpiresAt, a.dealership.timezone)} while you finish booking; it is released after that.</div>
+        )}
+        {a.status === 'AWAITING_PAYMENT' && (
+          <div className="meta">Your vehicle is ready. Please pay at the {a.dealership.name} desk to collect it.</div>
         )}
         {cancel.error ? <ErrorNote error={cancel.error} /> : null}
       </div>

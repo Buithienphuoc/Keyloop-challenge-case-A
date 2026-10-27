@@ -59,10 +59,23 @@ final case class DayQuery(date: LocalDate)
 object DayQuery:
   given Reads[DayQuery] = (__ \ "date").read(Validate.isoDate).map(DayQuery.apply)
 
+/** The dealership's job list, optionally narrowed to one status. */
+final case class JobsQuery(status: Option[AppointmentStatus])
+
+object JobsQuery:
+  private val listable = AppointmentStatus.values.filterNot(s => s == AppointmentStatus.HELD || s == AppointmentStatus.EXPIRED)
+  given Reads[JobsQuery] = (__ \ "status").readNullable(Validate.oneOf(listable)).map(JobsQuery.apply)
+
 final case class StatusChange(status: AppointmentStatus, reason: Option[String])
 
 object StatusChange:
-  private val settable = Array(AppointmentStatus.IN_PROGRESS, AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW)
+  private val settable = Array(
+    AppointmentStatus.IN_PROGRESS,
+    AppointmentStatus.AWAITING_PAYMENT,
+    AppointmentStatus.COMPLETED,
+    AppointmentStatus.CANCELLED,
+    AppointmentStatus.NO_SHOW
+  )
   given Reads[StatusChange] = (
     (__ \ "status").read(Validate.oneOf(settable)) and
       (__ \ "reason").readNullable(Validate.text(0, 500)).map(_.filter(_.nonEmpty))

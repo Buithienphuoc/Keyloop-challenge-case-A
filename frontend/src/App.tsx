@@ -4,6 +4,7 @@ import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { Loading } from './components/ui';
 import { LoginPage, RegisterPage } from './pages/AuthPages';
+import { JobsOverviewPage } from './pages/admin/JobsOverviewPage';
 import { ResourcesPage } from './pages/admin/ResourcesPage';
 import { AppointmentsPage } from './pages/customer/AppointmentsPage';
 import { BookPage } from './pages/customer/BookPage';
@@ -65,6 +66,7 @@ export function App() {
         <Route path="/parts" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER', 'PARTS_STAFF', 'TECHNICIAN']}><PartsPage /></Only>} />
         <Route path="/staff/requests" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN']}><QueuePage /></Only>} />
         <Route path="/admin" element={<Only roles={['ADMIN']}><ResourcesPage /></Only>} />
+        <Route path="/admin/jobs" element={<Only roles={['ADMIN']}><JobsOverviewPage /></Only>} />
         <Route path="/jobs" element={<Only roles={['TECHNICIAN']}><JobsPage /></Only>} />
         <Route path="/system" element={<Only roles={['SYSTEM_MANAGER']}><DealershipsPage /></Only>} />
         <Route path="/system/packages" element={<Only roles={['SYSTEM_MANAGER']}><PackagesPage /></Only>} />

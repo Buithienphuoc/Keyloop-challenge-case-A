@@ -1,10 +1,11 @@
 @startuml activity-workshop-day
 !include _style.iuml
-title Activity — the workshop day (UC30, UC32–UC35, UC40–UC42)
+title Activity — the workshop day (UC30, UC32–UC36, UC40–UC42)
 
 |Workshop controller|
 |Service advisor|
 |Technician|
+|Dealership admin|
 |System|
 |Workshop controller|
 start
@@ -26,9 +27,9 @@ endif
 :Select a booking;
 note left
   "Has the vehicle arrived?" is the advisor's call
-  at the desk. The system does not check the date:
-  a CONFIRMED job can be started on any day, also
-  before the booked one (open question, code review Q1).
+  at the desk. A CONFIRMED job may be started on any
+  day, also before the booked one: the vehicle can
+  arrive early (decided 27 Oct 2026, code review Q1).
 end note
 if (Has the vehicle arrived?) then (yes)
   :Hand the vehicle to the
@@ -47,9 +48,24 @@ if (Has the vehicle arrived?) then (yes)
   :CONFIRMED → **IN_PROGRESS**;
   |Technician|
   :Do the work;
-  :Job done;
+  :Show the customer the vehicle;
+  :Customer agrees: finish job;
+  note right: The advisor can also finish it from the board.
   |System|
-  :IN_PROGRESS → **COMPLETED**;
+  :IN_PROGRESS → **AWAITING_PAYMENT**
+  (bay and technician freed; the customer
+  sees "Awaiting payment");
+  |Dealership admin|
+  :Customer pays at the desk;
+  :Jobs & payments: "Payment received";
+  note right
+    No bank integration in the demo:
+    the admin records the payment by hand.
+    Only the admin may close a job (else 403).
+  end note
+  |System|
+  :AWAITING_PAYMENT → **COMPLETED**
+  (the customer sees "Finished");
 else (no)
   |Service advisor|
   if (Start time passed and\nthe customer did not come?) then (yes)

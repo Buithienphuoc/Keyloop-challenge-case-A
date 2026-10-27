@@ -28,7 +28,7 @@ two minutes). Against `npm run dev` instead: `BASE_URL=http://localhost:5173 sbt
 | UC22 Nearest free alternatives | `BookingRulesSpec` › offers the nearest free times when someone takes the chosen time first |
 | UC30 Workshop day board | `BookingJourneySpec` › finds the new booking; `WorkshopDaySpec` |
 | UC31 Review an advice request | `ConsultFirstSpec` › approves the inspection; declines the customisation (reason required) |
-| UC32 Record start, completion, no-show | `WorkshopDaySpec` › does not offer no-show before the start; starts … then marks it done |
+| UC32 Record start, finish, no-show | `WorkshopDaySpec` › does not offer no-show before the start; starts … then finishes it |
 | UC33 Cancel a booking (advisor) | `WorkshopDaySpec` › cancels a booking before work starts |
 | UC40 View my jobs | `BookingJourneySpec` › sees the job in My jobs; `WorkshopDaySpec` |
 | UC41 Start and finish a job | `WorkshopDaySpec` › starts and finishes their own job from My jobs |
@@ -60,11 +60,12 @@ two minutes). Against `npm run dev` instead: `BASE_URL=http://localhost:5173 sbt
 | | Pick a time → appointment CONFIRMED, request BOOKED | `ConsultFirstSpec` |
 | | Cancels before the start → request back to APPROVED | `ConsultFirstSpec` |
 | | Withdraw → CANCELLED | `ConsultFirstSpec` |
-| Workshop day | Vehicle arrived → start → IN_PROGRESS → done → COMPLETED (advisor) | `WorkshopDaySpec` |
+| Workshop day | Vehicle arrived → start → IN_PROGRESS → finish → AWAITING_PAYMENT (advisor) | `WorkshopDaySpec` |
+| | Admin records the payment → COMPLETED, customer sees Finished (UC36) | `WorkshopDaySpec` |
 | | Same, by the assigned technician from My jobs | `WorkshopDaySpec` |
 | | Not arrived, booking dropped → advisor cancels → CANCELLED, slot freed | `WorkshopDaySpec` |
 | | Not arrived, start passed → no-show | only the guard: no-show is not offered before the start (a past start cannot be booked from the browser; `ApiSpec` covers the move) |
-| | No way back from COMPLETED | `WorkshopDaySpec` (no action buttons after Done, no Cancel for the customer) |
+| | No way back from COMPLETED | `WorkshopDaySpec` (no action buttons after Finished, no Cancel for the customer) |
 
 Not reachable from a browser and left to the backend suite: the hold timing out after 10
 minutes, a technician moving someone else's job (the page never offers it, `ApiSpec` checks the
@@ -81,9 +82,9 @@ the diagrams and updated the SRS; what is left open is listed in
 2. **Built features were drawn as future work** (workshop controller, parts staff, re-plan,
    parts orders, packages, opening hours). Fixed in #3.
 3. **"Has the vehicle arrived?" is not checked against the date.** Staff can start a job on any
-   day ahead (`WorkshopDaySpec` starts and finishes jobs booked five days out). Still open:
-   #3 notes it on the diagram, and whether the code should refuse is question Q1 in
-   `docs/code-review-2026-10-26.md`.
+   day ahead (`WorkshopDaySpec` starts and finishes jobs booked five days out). Decided on
+   27 October 2026 (Q1 in `docs/code-review-2026-10-26.md`): this is allowed, because the
+   vehicle can arrive early, and the diagram says so.
 4. **Moving a job was in no diagram.** Fixed in #3 (UC35).
 5. **The diagrams README said nothing contradicts a drawn flow.** Fixed in #3.
 

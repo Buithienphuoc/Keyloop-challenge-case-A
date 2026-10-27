@@ -65,7 +65,11 @@ final case class AppointmentFilter(
     dealershipId: Option[String] = None,
     technicianId: Option[String] = None,
     from: Option[Instant] = None,
-    to: Option[Instant] = None
+    to: Option[Instant] = None,
+    /** Empty = every status (EXPIRED holds are never listed). */
+    statuses: Set[AppointmentStatus] = Set.empty,
+    newestFirst: Boolean = false,
+    limit: Int = 1000
 )
 
 final case class LockedAppointment(

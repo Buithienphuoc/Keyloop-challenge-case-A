@@ -2,7 +2,7 @@
 
 export type Role = 'CUSTOMER' | 'SERVICE_ADVISOR' | 'TECHNICIAN' | 'ADMIN' | 'SYSTEM_MANAGER' | 'WORKSHOP_CONTROLLER' | 'PARTS_STAFF';
 export type VehicleType = 'MOTORBIKE' | 'CAR';
-export type AppointmentStatus = 'HELD' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED';
+export type AppointmentStatus = 'HELD' | 'CONFIRMED' | 'IN_PROGRESS' | 'AWAITING_PAYMENT' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED';
 export type ConsultationKind = 'INSPECTION' | 'MODIFICATION';
 export type ConsultationStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'BOOKED' | 'CANCELLED';
 

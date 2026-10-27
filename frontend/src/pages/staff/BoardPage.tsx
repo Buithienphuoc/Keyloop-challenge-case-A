@@ -61,6 +61,7 @@ export function BoardPage() {
   const counts = {
     booked: active.length,
     inProgress: active.filter((a) => a.status === 'IN_PROGRESS').length,
+    awaitingPayment: active.filter((a) => a.status === 'AWAITING_PAYMENT').length,
     done: active.filter((a) => a.status === 'COMPLETED').length,
   };
 
@@ -68,7 +69,7 @@ export function BoardPage() {
     <div className="page">
       <PageHead title="Workshop day" actions={<DayNav date={date} zone={zone} onChange={(d) => { setDate(d); setSelectedId(null); }} />}>
         {dealership.name} · {DateTime.fromISO(date, { zone }).toFormat('cccc d LLLL')} · {counts.booked} jobs, {counts.inProgress} in progress,{' '}
-        {counts.done} done
+        {counts.awaitingPayment} awaiting payment, {counts.done} finished
       </PageHead>
       <ErrorNote error={appointments.error ?? resources.error} />
 
@@ -153,6 +154,7 @@ function JobPanel({ a, date, resources, onClose }: { a: Appointment; date: strin
   const { user } = useAuth();
   const canMove = user?.role === 'WORKSHOP_CONTROLLER' || user?.role === 'ADMIN';
   const canChangeStatus = user?.role !== 'WORKSHOP_CONTROLLER';
+  const isAdmin = user?.role === 'ADMIN';
   const change = useMutation({
     mutationFn: (status: AppointmentStatus) =>
       status === 'CANCELLED'
@@ -225,8 +227,13 @@ function JobPanel({ a, date, resources, onClose }: { a: Appointment; date: strin
           </button>
         )}
         {a.status === 'IN_PROGRESS' && (
+          <button className="btn btn-primary btn-sm" disabled={change.isPending} onClick={() => change.mutate('AWAITING_PAYMENT')}>
+            Customer checked the vehicle, finish job
+          </button>
+        )}
+        {a.status === 'AWAITING_PAYMENT' && isAdmin && (
           <button className="btn btn-primary btn-sm" disabled={change.isPending} onClick={() => change.mutate('COMPLETED')}>
-            Mark as done
+            Payment received, close job
           </button>
         )}
         {a.status === 'CONFIRMED' && started && (

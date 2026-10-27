@@ -68,7 +68,7 @@ class DomainRulesSpec extends AnyFunSpec with Matchers:
       allowed should contain theSameElementsAs Seq(
         HELD -> CONFIRMED, HELD -> CANCELLED, HELD -> EXPIRED,
         CONFIRMED -> IN_PROGRESS, CONFIRMED -> CANCELLED, CONFIRMED -> NO_SHOW,
-        IN_PROGRESS -> COMPLETED
+        IN_PROGRESS -> AWAITING_PAYMENT, AWAITING_PAYMENT -> COMPLETED
       )
     }
 

@@ -8,8 +8,9 @@ hide empty description
 HELD --> CONFIRMED : customer confirms before\nhold_expires_at (POST …/confirm)
 HELD --> CANCELLED : customer releases the hold
 HELD --> EXPIRED : hold ran out (system: booking flow,\njob move, confirm, or HoldSweeper)
-CONFIRMED --> IN_PROGRESS : advisor, admin or the\nassigned technician starts
-IN_PROGRESS --> COMPLETED : advisor, admin or the\nassigned technician finishes
+CONFIRMED --> IN_PROGRESS : advisor, admin or the\nassigned technician starts\n(any time, also before the booked start)
+IN_PROGRESS --> AWAITING_PAYMENT : advisor, admin or the\nassigned technician finishes\n(the customer has checked the vehicle)
+AWAITING_PAYMENT --> COMPLETED : dealership admin\nrecords the payment
 CONFIRMED --> CANCELLED : customer before the start time;\nadvisor / admin before work starts
 CONFIRMED --> NO_SHOW : advisor / admin,\nafter the start time
 CONFIRMED --> CONFIRMED : workshop controller / admin\nmoves the job (bay, technician)
@@ -25,5 +26,11 @@ note right of HELD
   EXCLUDE constraints apply to these three (V2).
   Cancelling or expiring a consulted appointment
   reopens its consultation request (BOOKED → APPROVED).
+end note
+
+note right of AWAITING_PAYMENT
+  The work is done: the bay, technician and
+  vehicle are free again (V3). The admin sees
+  every job by status in "Jobs & payments".
 end note
 @enduml

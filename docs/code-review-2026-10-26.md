@@ -36,7 +36,7 @@ Severity: **M** = worth fixing before the demo, **L** = nice to have.
 
 | # | Where | Question | Options |
 | --- | --- | --- | --- |
-| Q1 | `domain/Lifecycle.scala` `checkTransition` | Staff can start (CONFIRMED → IN_PROGRESS) a job on any day, also days before the booking; the Selenium suite does this on purpose. The workshop day diagram assumes the vehicle is at the desk. | Keep, and the diagram says staff may start early (drawn so now); or refuse a start before the appointment's local day with `409 NOT_STARTED_YET`-style error (the e2e tests would then book for today). Owner's call. |
+| Q1 | `domain/Lifecycle.scala` `checkTransition` | Staff can start (CONFIRMED → IN_PROGRESS) a job on any day, also days before the booking. | **Decided 27 Oct 2026: keep.** The vehicle can arrive early. Finishing now leads to AWAITING_PAYMENT, and only the dealership admin closes the job once paid (V3, UC36). |
 | Q2 | `frontend/src/pages/customer/` advice request form | The dealership defaults to the first in the list, not the one the customer last booked at, so a request can go to the wrong workshop if the customer does not look. | Preselect the remembered dealership, as the booking page does. |
 
 ## Kept on purpose (agree with the first review)
