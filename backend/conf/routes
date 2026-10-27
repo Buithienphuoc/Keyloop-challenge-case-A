@@ -28,6 +28,7 @@ GET     /api/appointments/:id              scheduler.modules.scheduling.adapters
 POST    /api/appointments/:id/cancel       scheduler.modules.scheduling.adapters.SchedulingController.cancel(id: String)
 POST    /api/appointments/:id/status       scheduler.modules.scheduling.adapters.SchedulingController.changeStatus(id: String)
 GET     /api/staff/appointments            scheduler.modules.scheduling.adapters.SchedulingController.dealershipDay
+GET     /api/staff/appointments/upcoming   scheduler.modules.scheduling.adapters.SchedulingController.dealershipUpcoming
 GET     /api/staff/workload                scheduler.modules.scheduling.adapters.SchedulingController.workload
 GET     /api/technician/jobs               scheduler.modules.scheduling.adapters.SchedulingController.technicianDay
 
