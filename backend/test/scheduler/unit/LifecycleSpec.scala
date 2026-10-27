@@ -45,11 +45,12 @@ class LifecycleSpec extends AnyFunSpec with Matchers:
       checkTransition(CONFIRMED, IN_PROGRESS, Role.SERVICE_ADVISOR, Start, Start - 1) shouldBe None
     }
 
-    it("lets the people who did the work finish it, and only the dealership admin mark it paid") {
+    it("lets the people who did the work finish it, and the technician or the admin mark it paid") {
       for role <- Seq(Role.TECHNICIAN, Role.SERVICE_ADVISOR, Role.ADMIN) do
         checkTransition(IN_PROGRESS, AWAITING_PAYMENT, role, Start, Start) shouldBe None
-      checkTransition(AWAITING_PAYMENT, COMPLETED, Role.ADMIN, Start, Start) shouldBe None
-      for role <- Seq(Role.TECHNICIAN, Role.SERVICE_ADVISOR, Role.CUSTOMER, Role.WORKSHOP_CONTROLLER) do
+      for role <- Seq(Role.TECHNICIAN, Role.ADMIN) do
+        checkTransition(AWAITING_PAYMENT, COMPLETED, role, Start, Start) shouldBe None
+      for role <- Seq(Role.SERVICE_ADVISOR, Role.CUSTOMER, Role.WORKSHOP_CONTROLLER, Role.SYSTEM_MANAGER) do
         checkTransition(AWAITING_PAYMENT, COMPLETED, role, Start, Start) shouldBe Some(ROLE_NOT_ALLOWED)
     }
 

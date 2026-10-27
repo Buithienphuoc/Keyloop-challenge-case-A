@@ -412,10 +412,10 @@ paths:
   /api/appointments:
     get:
       tags: [Staff]
-      summary: Every appointment, newest first (advisor, technician, admin); holds being confirmed are left out
+      summary: Every appointment, newest first (advisor, technician, admin, system manager); holds being confirmed are left out
       description: |
         Advisors, technicians and admins read the appointments of every dealership. Without
-        `dealershipId` the list is the caller's own dealership; pass another dealership's id, or `all`.
+        `dealershipId` the list is the caller's own dealership (every dealership for the system manager); pass another dealership's id, or `all`.
       parameters:
         - { name: dealershipId, in: query, required: false, schema: { type: string, description: 'A dealership id, or "all"' } }
         - { name: status, in: query, required: false, schema: { type: string, enum: [CONFIRMED, IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW] } }
@@ -730,7 +730,11 @@ paths:
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Appointment' } } } } }
   /api/admin/bays:
-    get: { tags: [Admin], summary: Service bays of my dealership, responses: { '200': { description: OK } } }
+    get:
+      tags: [Admin]
+      summary: Service bays of my dealership (the system manager names one with dealershipId)
+      parameters: [{ name: dealershipId, in: query, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: OK } }
     post:
       tags: [Admin]
       summary: Add a bay
@@ -744,7 +748,11 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { isActive: { type: boolean } } } } } }
       responses: { '200': { description: OK } }
   /api/admin/technicians:
-    get: { tags: [Admin], summary: Technicians with skills and shifts, responses: { '200': { description: OK } } }
+    get:
+      tags: [Admin]
+      summary: Technicians with skills and shifts (the system manager names a dealership with dealershipId)
+      parameters: [{ name: dealershipId, in: query, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: OK } }
     post:
       tags: [Admin]
       summary: Add a technician (optionally with a login)
@@ -805,6 +813,8 @@ paths:
       tags: [System]
       summary: Onboard a dealership together with its first admin
       responses: { '201': { description: Created } }
+  /api/system/vehicles:
+    get: { tags: [System], summary: Every customer's vehicles with their owner, newest first, responses: { '200': { description: OK } } }
   /api/system/users:
     get:
       tags: [System]

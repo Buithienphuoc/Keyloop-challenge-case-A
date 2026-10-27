@@ -16,7 +16,7 @@ import scheduler.modules.scheduling.domain.VehicleType
 import scheduler.modules.system.*
 import scheduler.modules.system.application.{NewAdmin, NewDealership, PackageAdminService, TenantService}
 import scheduler.modules.system.application.PackageRequests.NewPackage
-import scheduler.modules.vehicles.{NewVehicle, Vehicle, VehicleRepository}
+import scheduler.modules.vehicles.{NewVehicle, OwnedVehicle, Vehicle, VehicleRepository}
 import scheduler.modules.vehicles.application.VehicleService
 import scheduler.shared.{AppError, DbSession, Log}
 import scheduler.support.Fakes.*
@@ -192,6 +192,7 @@ class AdminServicesSpec extends AnyFunSpec with Matchers:
     val bike = Vehicle("v1", VehicleType.MOTORBIKE, "Honda", "Wave", None, "59A-123", None, None)
     object Repo extends VehicleRepository:
       def listByOwner(ownerId: String): Seq[Vehicle] = if ownerId == "u1" then Seq(bike) else Nil
+      def listAll(): Seq[OwnedVehicle] = Seq(OwnedVehicle(bike, "Owner", "owner@test.local"))
       def findOwned(ownerId: String, vehicleId: String): Option[Vehicle] = Option.when(ownerId == "u1" && vehicleId == "v1")(bike)
       def add(ownerId: String, v: NewVehicle): Vehicle = bike.copy(id = "v2", plate = v.plate)
 

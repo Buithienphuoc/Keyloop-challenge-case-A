@@ -14,7 +14,7 @@ import AppointmentStatus.*
  * A hold is confirmed through its own endpoint (it has an expiry check); time-outs are
  * applied by the system, never by a person. Staff may start a job before its booked time
  * (the vehicle can arrive early). Finishing the work means the customer has checked the
- * vehicle; only the dealership admin, who takes the payment, closes the job.
+ * vehicle; the technician or the dealership admin closes the job once the customer has paid.
  */
 object Lifecycle:
   private val Transitions: Map[AppointmentStatus, Set[AppointmentStatus]] = Map(
@@ -35,7 +35,7 @@ object Lifecycle:
     Role.CUSTOMER -> Set(CONFIRMED, CANCELLED),
     Role.SERVICE_ADVISOR -> Set(IN_PROGRESS, AWAITING_PAYMENT, CANCELLED, NO_SHOW),
     Role.ADMIN -> Set(IN_PROGRESS, AWAITING_PAYMENT, COMPLETED, CANCELLED, NO_SHOW),
-    Role.TECHNICIAN -> Set(IN_PROGRESS, AWAITING_PAYMENT),
+    Role.TECHNICIAN -> Set(IN_PROGRESS, AWAITING_PAYMENT, COMPLETED),
     Role.WORKSHOP_CONTROLLER -> Set.empty,
     Role.PARTS_STAFF -> Set.empty,
     Role.SYSTEM_MANAGER -> Set.empty

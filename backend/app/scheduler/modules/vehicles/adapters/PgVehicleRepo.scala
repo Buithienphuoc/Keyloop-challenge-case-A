@@ -5,7 +5,7 @@ import java.sql.SQLException
 import anorm.*
 
 import scheduler.modules.scheduling.domain.VehicleType
-import scheduler.modules.vehicles.{NewVehicle, Vehicle, VehicleRepository}
+import scheduler.modules.vehicles.{NewVehicle, OwnedVehicle, Vehicle, VehicleRepository}
 import scheduler.shared.{AppError, Db, PgErrors, Sql}
 import scheduler.shared.Sql.*
 
@@ -27,6 +27,15 @@ final class PgVehicleRepo(db: Db) extends VehicleRepository:
   def listByOwner(ownerId: String): Seq[Vehicle] = db.run { s =>
     given java.sql.Connection = Sql.connection(s)
     SQL"SELECT * FROM vehicles WHERE owner_id = $ownerId::uuid ORDER BY created_at".as(vehicle.*)
+  }
+
+  def listAll(): Seq[OwnedVehicle] = db.run { s =>
+    given java.sql.Connection = Sql.connection(s)
+    SQL"""SELECT v.*, u.full_name AS owner_name, u.email AS owner_email
+          FROM vehicles v JOIN users u ON u.id = v.owner_id ORDER BY v.created_at DESC LIMIT 1000"""
+      .as((vehicle ~ SqlParser.str("owner_name") ~ SqlParser.str("owner_email")).map { case v ~ name ~ email =>
+        OwnedVehicle(v, name, email)
+      }.*)
   }
 
   def findOwned(ownerId: String, vehicleId: String): Option[Vehicle] = db.run { s =>

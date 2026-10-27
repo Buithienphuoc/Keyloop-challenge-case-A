@@ -207,7 +207,6 @@ export function BookPage() {
 
           {!blockedBy && w.step === 'service' && vehicle && (
             <ServiceStep
-              vehicle={vehicle}
               packages={fitsPackages}
               packageId={w.packageId}
               ready={Boolean(pkg)}

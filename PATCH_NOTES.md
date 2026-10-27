@@ -13,6 +13,28 @@ Entry format:
 
 ## Unreleased
 
+### Three roles, the brief's main feature first (`feat/simplify-by-role`)
+- **Changed:** the web app has three roles, as the brief needs: the customer books, the
+  technician carries out the job, the system manager sees everything. Advisor, dealership admin,
+  workshop controller and parts pages are gone from the web app; those accounts and all data
+  stay in the database, and signing in with one shows a short "not used in this version" note.
+- **Changed:** a booking assigns the qualified, free technician it reserves (brief requirement
+  3: the confirmed appointment names customer, vehicle, technician and bay). Customers see the
+  technician on the confirmation and in My appointments.
+- **Changed:** customer menu is Home, Book a service, My appointments, My vehicles. Home no
+  longer shows advice-request cards or the green reply notice, and asks "what does your vehicle
+  need?".
+- **Changed:** the technician has one page, Service requests (their jobs by day), and closes a
+  job once the customer has paid (AWAITING_PAYMENT → COMPLETED is now allowed for technicians).
+- **Added:** "All data" for the system manager: appointments of every dealership, bays and
+  technicians of each one, every customer's vehicle. API: `GET /api/appointments` and
+  `GET /api/admin/bays|technicians?dealershipId=` are open to the system manager (read only),
+  and `GET /api/system/vehicles` is new.
+- **Tests:** Selenium cut from 69 to about 30 tests: removed the advisor, admin, controller and
+  parts suites (BoardUpcoming, ConsultFirst, RolePermissions, WorkshopDay, BackOffice) and the
+  slower DoubleSubmit cases already covered by the backend concurrency tests; a new
+  BookingJourneySpec walks customer → technician → system manager.
+
 ### #24 Who sees what: every workshop for advisors, technicians and admins (`feat/role-permissions`)
 - **Changed:** service advisors, technicians and dealership admins read every appointment and
   advice request of every workshop, and may move its status within the lifecycle rules (a

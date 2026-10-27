@@ -175,7 +175,9 @@ final class BookingService(
         idempotencyKey = idempotencyKey,
         createdBy = auth.userId,
         status = status,
-        holdExpiresAt = Option.when(hold)(now.plusSeconds(holdMinutes * 60L))
+        holdExpiresAt = Option.when(hold)(now.plusSeconds(holdMinutes * 60L)),
+        // The brief: a confirmed appointment names its customer, vehicle, technician and bay.
+        technicianAssigned = true
       )
     )
     writer.recordEvent(s, AppointmentEvent(appointmentId, None, status, auth.userId, None))

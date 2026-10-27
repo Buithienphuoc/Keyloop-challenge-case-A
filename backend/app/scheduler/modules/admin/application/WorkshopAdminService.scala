@@ -75,11 +75,15 @@ final case class BayCreated(id: String, name: String, bayType: String, isActive:
 final case class WorkshopView(bays: Seq[BayRecord], technicians: Seq[TechnicianRecord])
 final case class HoursUpdated(hours: WorkshopHours, upcomingOutsideHours: Int)
 
-/** Dealership administration: bays, technicians (skills, shifts) and staff accounts, always for the caller's own dealership. */
+/**
+ * Dealership administration: bays, technicians (skills, shifts) and staff accounts, always for the
+ * caller's own dealership. The system manager may read the bays and technicians of any dealership.
+ */
 final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity: UserAccounts):
   import AdminRequests.*
 
-  def listBays(auth: AuthContext): Seq[BayRecord] = workshop.listBays(auth.requireDealership)
+  def listBays(auth: AuthContext, dealershipId: Option[String] = None): Seq[BayRecord] =
+    workshop.listBays(readable(auth, dealershipId))
 
   def addBay(auth: AuthContext, input: NewBay, log: Log): BayCreated =
     val id = workshop.addBay(auth.requireDealership, input.name, input.bayType)
@@ -91,7 +95,14 @@ final class WorkshopAdminService(db: Db, workshop: WorkshopRepository, identity:
     if !workshop.setBayActive(auth.requireDealership, bayId, isActive) then throw AppError.notFound("Bay")
     log.info("admin.bay_updated", "bayId" -> bayId, "isActive" -> isActive)
 
-  def listTechnicians(auth: AuthContext): Seq[TechnicianRecord] = workshop.listTechnicians(auth.requireDealership)
+  def listTechnicians(auth: AuthContext, dealershipId: Option[String] = None): Seq[TechnicianRecord] =
+    workshop.listTechnicians(readable(auth, dealershipId))
+
+  /** The dealership a list is read for: the admin's own; the system manager names any one. */
+  private def readable(auth: AuthContext, dealershipId: Option[String]): String =
+    if auth.role == Role.SYSTEM_MANAGER then
+      dealershipId.getOrElse(throw AppError.badRequest("DEALERSHIP_REQUIRED", "Give a dealershipId"))
+    else auth.requireDealership
 
   def addTechnician(auth: AuthContext, input: NewTechnician, log: Log): String =
     val dealershipId = auth.requireDealership

@@ -49,13 +49,15 @@ def assertCanSee(auth: AuthContext, ownerId: String, dealershipId: String, what:
 
 /**
  * Which dealership a staff list covers: `None` = every dealership. Without a choice it is the
- * caller's own; "all" or another dealership's id is allowed for the roles that see every workshop.
+ * caller's own (every dealership for the system manager); "all" or another dealership's id is
+ * allowed for the roles that see every workshop.
  */
 def listScope(auth: AuthContext, requested: Option[String]): Option[String] =
   requested match
+    case None if auth.role == Role.SYSTEM_MANAGER => None
     case None => Some(auth.requireDealership)
     case Some(d) if auth.dealershipId.contains(d) => Some(d)
-    case Some(_) if !Role.AllWorkshopRoles.contains(auth.role) => throw AppError.forbidden("This belongs to another dealership")
+    case Some(_) if !Role.AllWorkshopRoles.contains(auth.role) && auth.role != Role.SYSTEM_MANAGER => throw AppError.forbidden("This belongs to another dealership")
     case Some(DealershipScope.All) => None
     case Some(d) => Some(d)
 

@@ -5,36 +5,26 @@ import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { Loading } from './components/ui';
 import { LoginPage, RegisterPage } from './pages/AuthPages';
-import { JobsOverviewPage } from './pages/admin/JobsOverviewPage';
-import { ResourcesPage } from './pages/admin/ResourcesPage';
+import { RoleNotUsedPage } from './pages/RoleNotUsedPage';
 import { AppointmentsPage } from './pages/customer/AppointmentsPage';
 import { BookPage } from './pages/customer/BookPage';
-import { ConsultPage } from './pages/customer/ConsultPage';
 import { HomePage } from './pages/customer/HomePage';
-import { RequestsPage } from './pages/customer/RequestsPage';
 import { VehiclesPage } from './pages/customer/VehiclesPage';
-import { BoardPage } from './pages/staff/BoardPage';
 import { JobsPage } from './pages/staff/JobsPage';
-import { QueuePage } from './pages/staff/QueuePage';
-import { AllAppointmentsPage } from './pages/staff/AllAppointmentsPage';
+import { AllDataPage } from './pages/system/AllDataPage';
 import { DealershipsPage } from './pages/system/DealershipsPage';
-import { PeoplePage } from './pages/system/PeoplePage';
 import { PackagesPage } from './pages/system/PackagesPage';
-import { PartsPage } from './pages/parts/PartsPage';
-import { WorkloadPage } from './pages/staff/WorkloadPage';
-import { AdvisorAppointmentsPage } from './pages/staff/AdvisorAppointmentsPage';
-import { OpenServicesPage } from './pages/staff/OpenServicesPage';
-import { AdvisorPage } from './pages/customer/AdvisorPage';
+import { PeoplePage } from './pages/system/PeoplePage';
 
 const HOME: Record<Role, string> = {
   CUSTOMER: '/',
-  // First screen after sign-in: what still needs someone (open appointments / open services).
-  SERVICE_ADVISOR: '/staff/advisor-appointments',
-  ADMIN: '/staff/board',
-  TECHNICIAN: '/services/open',
+  TECHNICIAN: '/jobs',
   SYSTEM_MANAGER: '/system',
-  WORKSHOP_CONTROLLER: '/staff/board',
-  PARTS_STAFF: '/parts',
+  // Roles the brief does not need: their accounts stay in the database but have no pages.
+  SERVICE_ADVISOR: '/not-used',
+  ADMIN: '/not-used',
+  WORKSHOP_CONTROLLER: '/not-used',
+  PARTS_STAFF: '/not-used',
 };
 
 function Only({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
@@ -69,23 +59,13 @@ export function App() {
         <Route path="/" element={user.role === 'CUSTOMER' ? <HomePage /> : <Navigate to={HOME[user.role]} replace />} />
         <Route path="/book" element={<Only roles={['CUSTOMER']}><BookPage /></Only>} />
         <Route path="/appointments" element={<Only roles={['CUSTOMER']}><AppointmentsPage /></Only>} />
-        <Route path="/requests" element={<Only roles={['CUSTOMER']}><RequestsPage /></Only>} />
-        <Route path="/requests/new" element={<Only roles={['CUSTOMER']}><ConsultPage /></Only>} />
         <Route path="/vehicles" element={<Only roles={['CUSTOMER']}><VehiclesPage /></Only>} />
-        <Route path="/advisor" element={<Only roles={['CUSTOMER']}><AdvisorPage /></Only>} />
-        <Route path="/staff/advisor-appointments" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN']}><AdvisorAppointmentsPage /></Only>} />
-        <Route path="/services/open" element={<Only roles={['TECHNICIAN', 'SERVICE_ADVISOR']}><OpenServicesPage /></Only>} />
-        <Route path="/staff/board" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER']}><BoardPage /></Only>} />
-        <Route path="/staff/workload" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER']}><WorkloadPage /></Only>} />
-        <Route path="/parts" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'WORKSHOP_CONTROLLER', 'PARTS_STAFF', 'TECHNICIAN']}><PartsPage /></Only>} />
-        <Route path="/staff/requests" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'TECHNICIAN']}><QueuePage /></Only>} />
-        <Route path="/staff/appointments" element={<Only roles={['SERVICE_ADVISOR', 'ADMIN', 'TECHNICIAN']}><AllAppointmentsPage /></Only>} />
-        <Route path="/admin" element={<Only roles={['ADMIN']}><ResourcesPage /></Only>} />
-        <Route path="/admin/jobs" element={<Only roles={['ADMIN']}><JobsOverviewPage /></Only>} />
         <Route path="/jobs" element={<Only roles={['TECHNICIAN']}><JobsPage /></Only>} />
         <Route path="/system" element={<Only roles={['SYSTEM_MANAGER']}><DealershipsPage /></Only>} />
+        <Route path="/system/data" element={<Only roles={['SYSTEM_MANAGER']}><AllDataPage /></Only>} />
         <Route path="/system/people" element={<Only roles={['SYSTEM_MANAGER']}><PeoplePage /></Only>} />
         <Route path="/system/packages" element={<Only roles={['SYSTEM_MANAGER']}><PackagesPage /></Only>} />
+        <Route path="/not-used" element={<RoleNotUsedPage />} />
       </Route>
       <Route path="/login" element={<Navigate to={(location.state as { from?: string } | null)?.from ?? HOME[user.role]} replace />} />
       <Route path="*" element={<Navigate to={HOME[user.role]} replace />} />

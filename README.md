@@ -36,13 +36,13 @@ All demo accounts use the password **`Demo@2026`** in the dev profile (the login
 
 | Account | Role | Try this |
 | --- | --- | --- |
-| `customer@demo.vn` | Customer | Book maintenance; pick a time for the approved customisation request |
-| `advisor.d1@demo.vn` | Service advisor, District 1 | Take an open advisor appointment; assign a technician to a new service; workshop day board |
-| `tech.hung@demo.vn` | Technician, District 1 | Take an open service; start and finish your jobs |
-| `admin.d1@demo.vn` | Dealership admin, District 1 | Bays, technicians (skills and shifts), staff accounts |
-| `sysadmin@demo.vn` | System manager | Onboard a new dealership with its first admin; edit the service package catalogue |
-| `controller.d1@demo.vn` | Workshop controller, District 1 | Workload per bay and technician; move a job to another bay or technician |
-| `parts.d1@demo.vn` | Parts staff, District 1 | Stock list; move parts orders from requested to issued |
+| `customer@demo.vn` | Customer | Book a service: vehicle, package, dealership and a free time; see it in My appointments |
+| `tech.hung@demo.vn` | Technician, District 1 | Service requests: start, finish and close your jobs |
+| `sysadmin@demo.vn` | System manager | Sees everything: dealerships, All data (appointments, bays, technicians, vehicles), people, the package catalogue; onboard a dealership |
+
+The app has these three roles only, as the brief needs. Older staff accounts in the seed
+(`advisor.d1`, `admin.d1`, `controller.d1`, `parts.d1`) still exist in the database but have no
+pages: they see a short "not used in this version" note after signing in.
 
 The seed fills part of the next working day at District 1 (09:00 has one stand left, 10:00 is
 full) so availability looks real. To start again from an empty database, stop the API and delete
@@ -155,21 +155,18 @@ cd e2e && sbt test                            # BASE_URL=http://localhost:8080 b
 
 | Suite (`e2e/src/test/scala/scheduler/e2e/…`) | What it does |
 | --- | --- |
-| `BookingJourneySpec` | One booking across every role: a new customer registers, adds a motorbike, picks a package, **holds** a time, gives it back, holds it again and confirms; sends an advice request. The advisor finds the job on the day board and the request in the queue; the workshop controller checks the workload and **moves** the job to another bay and technician; that technician sees it (with the customer's note) and **requests a part**; the parts desk restocks and **issues** it; the customer **cancels**. Leaves the demo data as it found it |
-| `AuthSpec` | Wrong password, demo-account buttons, sign-out, a customer kept out of staff pages, each role's start page |
-| `BackOfficeSpec` | Dealership admin: bays, technicians, saving opening hours. System manager: dealerships and the package catalogue |
-| `ConsultFirstSpec` | The consult-first activity diagram: an inspection and a customisation request; the advisor approves one (time, skill, estimate, message) and declines the other (a reason is required); the customer reads both replies, books the approved one, cancels it (the request re-opens) and withdraws it |
-| `WorkshopDaySpec` | The workshop day diagram and the appointment lifecycle: no-show is not offered before the start; the advisor starts and finishes one job, the admin hands another to tech.hung, who starts and finishes it in My jobs; the advisor cancels a third; the customer sees Done and Cancelled |
+| `BookingJourneySpec` | The brief's main feature with the three roles: a new customer adds a car, picks a package, **holds** a time, gives it back, holds it again and confirms; the booking names its technician. That technician finds it under Service requests with the customer's note, **starts**, **finishes** and **closes** it once paid; the customer sees it finished; the system manager sees it in All data with customer, vehicle, technician and bay |
 | `BookingRulesSpec` | The checks in the booking diagram: My vehicles; only packages for the vehicle's type; "cannot do this job" at a dealership without a car lift; another customer takes the chosen time first (through the API), so the page offers the nearest free times and one is booked; the `.ics` calendar file |
-| `DoubleSubmitSpec` | The main feature's worst case, on a slowed-down network: Hold and Confirm each clicked five times at once and double-clicked, the time changed while the hold is still on its way, the same vehicle held from two tabs. Each ends with one appointment and no false error. A booked vehicle's buttons are locked (and the API refuses it) until the booking is cancelled |
-| `AdminSpec` | Set-up that someone else then uses: the admin adds a bay (and takes it out of service), a technician with a login and an advisor account, and both sign in; the system manager onboards a dealership, sees its zero capacity, its admin signs in, and customers are told it cannot do the job yet. Adds rows, tagged with the run, that only a database reset removes |
+| `DoubleSubmitSpec` | The main feature's worst case on a slowed-down network: Hold and Confirm each clicked five times at once end with one appointment and no false error; a booked vehicle's buttons are locked |
+| `AuthSpec` | Wrong password, demo-account buttons, sign-out, a customer kept out of system pages, each role's start page |
+| `SystemManagerSpec` | Dealerships, All data (appointments, bays and technicians, vehicles), People and the package catalogue |
+| `OnboardingSpec` | The system manager onboards a dealership and sees its zero capacity; customers are told it cannot do the job yet. Adds rows, tagged with the run, that only a database reset removes |
 
-69 tests, about three minutes. Each use case and activity-diagram branch is mapped to its test in
-[docs/e2e-traceability.md](docs/e2e-traceability.md), together with the places where the code
-has moved ahead of the diagrams. CI runs them on every pull request against the freshly built images;
-a failure uploads a screenshot of each failing step and the API logs. Writing them found a real
-bug: behind nginx, Play's CORS filter refused the browser's sign-in (403), now fixed by setting
-`CORS_ORIGIN` to the web app's address in docker-compose and on Azure.
+Each use case is mapped to its test in [docs/e2e-traceability.md](docs/e2e-traceability.md).
+CI runs them on every pull request against the freshly built images; a failure uploads a
+screenshot of each failing step and the API logs. Writing them found a real bug: behind nginx,
+Play's CORS filter refused the browser's sign-in (403), now fixed by setting `CORS_ORIGIN` to the
+web app's address in docker-compose and on Azure.
 
 ## Scale out and deploy
 
@@ -208,30 +205,24 @@ bash setup.sh   # then add the 5 printed values as GitHub repository variables
 
 ## What it does
 
-**Customers** (the main audience, so their flow comes first)
-- *Regular maintenance*: pick a vehicle, a fixed-price package with a visible checklist, a
-  dealership and a free time; confirm. A service ticket fills in beside the steps.
-- *Check something specific* and *Customise my vehicle*: describe the problem or idea; an
-  advisor turns it into a schedulable job (duration, skill, bay type, estimate); the customer
-  then picks a time. Both use one "consult first, then book" flow.
+**Customers** (the main feature, so their flow comes first)
+- *Book a service*: pick a vehicle, a fixed-price package with a visible checklist, a
+  dealership and a free time; confirm. The system only offers a time when a bay of the right
+  type and a qualified technician on shift are both free for the whole job, and the confirmed
+  appointment names the customer, vehicle, technician and bay. A service ticket fills in beside
+  the steps.
 - Availability refreshes every 30 s and opens on the first day that still has room.
 - If someone takes the slot during checkout, the page offers the three nearest free times.
 - The chosen time is **held for 10 minutes** while the customer reviews the booking (a countdown
   shows it); confirming turns the hold into a booking, going back releases it.
 - Cancel before the start; add to calendar (.ics); manage vehicles.
 
-**Staff**
-- *Service advisor*: a day board (bays × hours) with start / done / no-show / cancel; the
-  advice-request queue.
-- *Technician*: today's jobs with large start and finish buttons.
-- *Dealership admin*: bays (in or out of service), technicians with skills, shifts and working
-  days, staff accounts, opening hours (with a count of bookings that fall outside new hours).
-- *Workshop controller*: the day's load per bay and technician; move a job to another bay or
-  technician (the same database constraints refuse a clash).
-- *Parts staff*: stock list and parts orders (requested → ordered → received → issued), which an
-  advisor or technician can raise from a job; issuing takes stock and can never go below zero.
-- *System manager*: all dealerships with capacity figures; onboard a dealership and its admin;
-  the service package catalogue.
+**Technician**: Service requests, the jobs booked with them for a day (checklist and the
+customer's note), with large buttons to start, finish and close a job once the customer has paid.
+
+**System manager**: sees everything. All dealerships with capacity figures; All data
+(appointments of every dealership, bays and technicians, every customer's vehicle); people; the
+service package catalogue; onboarding a dealership.
 
 ## Diagrams
 

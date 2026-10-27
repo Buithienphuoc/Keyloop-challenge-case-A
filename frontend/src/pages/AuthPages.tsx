@@ -11,9 +11,7 @@ const SHOW_DEMO_ACCOUNTS =
 const DEMO_PASSWORD = 'Demo@2026';
 const DEMO_ACCOUNTS = [
   { email: 'customer@demo.vn', role: 'Customer' },
-  { email: 'advisor.d1@demo.vn', role: 'Service advisor' },
   { email: 'tech.hung@demo.vn', role: 'Technician' },
-  { email: 'admin.d1@demo.vn', role: 'Dealership admin' },
   { email: 'sysadmin@demo.vn', role: 'System manager' },
 ];
 

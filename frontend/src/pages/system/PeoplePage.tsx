@@ -18,12 +18,10 @@ interface Person {
 
 const TABS: { role: Role; label: string }[] = [
   { role: 'CUSTOMER', label: 'Customers' },
-  { role: 'SERVICE_ADVISOR', label: 'Advisors' },
   { role: 'TECHNICIAN', label: 'Technicians' },
-  { role: 'ADMIN', label: 'Admins' },
 ];
 
-/** The system manager's list of everyone: customers, advisors, technicians and admins of every workshop. */
+/** The system manager's list of people: customers and the technicians of every workshop. */
 export function PeoplePage() {
   const [role, setRole] = useState<Role>('CUSTOMER');
   const people = useQuery({ queryKey: ['system', 'users'], queryFn: () => get<Person[]>('/api/system/users') });
@@ -33,7 +31,7 @@ export function PeoplePage() {
   return (
     <div className="page page-narrow">
       <PageHead title="People">
-        Everyone with an account, by role. The workshops themselves are on <Link to="/system">Dealerships</Link>.
+        Customers and technicians with an account. The workshops themselves are on <Link to="/system">Dealerships</Link>.
       </PageHead>
       <div className="tabs" role="tablist">
         {TABS.map((t) => (

@@ -71,7 +71,7 @@ final class SchedulingController(
     json()(appointments.listUpcoming(req.auth))
   }
 
-  def listAll: Action[AnyContent] = guard(SERVICE_ADVISOR, ADMIN, TECHNICIAN).async { req =>
+  def listAll: Action[AnyContent] = guard(SERVICE_ADVISOR, ADMIN, TECHNICIAN, SYSTEM_MANAGER).async { req =>
     val q = query[AllAppointmentsQuery](req)
     json()(appointments.listAll(req.auth, q.dealershipId, q.status))
   }
