@@ -141,3 +141,9 @@ verified in the browser, no automated UI test; **Partial** = only part of the us
    UC53, UC62, UC70, UC71 were added; the state diagram now has HELD and EXPIRED; moving a job
    to another bay or technician is UC35 and the first step of the workshop day diagram. See
    `docs/code-review-2026-10-26.md`.
+5. **27 October 2026: one live appointment per vehicle.** A vehicle that is on hold, booked or
+   in the workshop cannot be booked again until that appointment is cancelled or done (the
+   pages lock it, the API answers `409 VEHICLE_HAS_APPOINTMENT`). `activity-book-package.puml`
+   and `activity-consult-first.puml` do not draw this check yet: it belongs right after
+   "choose a vehicle" ("Vehicle already has a live appointment? yes → cancel it in My
+   appointments first"). Tested by `DoubleSubmitSpec`.

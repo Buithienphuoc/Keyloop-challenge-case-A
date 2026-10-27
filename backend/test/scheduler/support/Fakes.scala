@@ -121,6 +121,8 @@ object Fakes:
     def insert(s: DbSession, a: NewAppointment): String = throw UnsupportedOperationException("not used here")
     def findIdByIdempotencyKey(s: DbSession, customerId: String, key: String): Option[String] = None
     def lockIdempotencyKey(s: DbSession, customerId: String, key: String): Unit = ()
+    def lockVehicle(s: DbSession, vehicleId: String): Unit = ()
+    def liveAppointmentOf(s: DbSession, vehicleId: String, asOf: Instant): Option[LiveAppointment] = None
     def lockForUpdate(s: DbSession, id: String): Option[LockedAppointment] = rows.get(id)
     def setStatus(s: DbSession, id: String, status: AppointmentStatus, cancelReason: Option[String]): Unit =
       statusChanges += ((id, status, cancelReason))

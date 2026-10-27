@@ -4,6 +4,10 @@
  *  - Tags every request with an X-Request-Id so a problem a user reports can be found in
  *    the server logs (the server reuses this ID on every log line for the request).
  *  - Turns the API's error shape into an ApiError the UI can show.
+ *  - Sends a change (POST, PATCH, PUT, DELETE) only once while it is on its way: the same
+ *    request again before the answer, from a double click or several clicks inside one frame
+ *    (before any button can be disabled), gets the first one's answer instead of a second
+ *    write. A request with its own Idempotency-Key is told apart by that key.
  */
 
 const TOKEN_KEY = 'scheduler.token';
@@ -45,10 +49,22 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
-export async function api<T>(
-  path: string,
-  options: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
-): Promise<T> {
+type Options = { method?: string; body?: unknown; headers?: Record<string, string> };
+
+const inFlight = new Map<string, Promise<unknown>>();
+
+export function api<T>(path: string, options: Options = {}): Promise<T> {
+  const method = options.method ?? 'GET';
+  if (method === 'GET') return send<T>(path, options);
+  const key = JSON.stringify([method, path, options.body ?? null, options.headers?.['Idempotency-Key'] ?? null]);
+  const pending = inFlight.get(key);
+  if (pending) return pending as Promise<T>;
+  const p = send<T>(path, options).finally(() => inFlight.delete(key));
+  inFlight.set(key, p);
+  return p;
+}
+
+async function send<T>(path: string, options: Options): Promise<T> {
   const requestId = crypto.randomUUID();
   const token = getToken();
   let res: Response;

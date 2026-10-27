@@ -25,9 +25,6 @@ class BookingRulesSpec extends E2ESuite with CustomerSteps:
   /** Holds placed through the API by other customers; released at the end. */
   private var otherHolds = Seq.empty[(Api, String)]
 
-  private def vehicleChoice(plate: String): By =
-    By.xpath(s"//button[contains(@class,'choice') and .//*[normalize-space(.)=${Ui.literal(plate)}]]")
-
   private def packageNames: Seq[String] =
     ui.all(By.cssSelector(".choices button.choice .title")).map(_.getText.replace("Recommended", "").trim)
 

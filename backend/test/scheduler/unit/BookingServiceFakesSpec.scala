@@ -67,6 +67,8 @@ class BookingServiceFakesSpec extends AnyFunSpec with Matchers:
         s"a${inserted.size}"
       def findIdByIdempotencyKey(s: DbSession, customerId: String, key: String) = None
       def lockIdempotencyKey(s: DbSession, customerId: String, key: String) = ()
+      def lockVehicle(s: DbSession, vehicleId: String) = ()
+      def liveAppointmentOf(s: DbSession, vehicleId: String, asOf: Instant) = None
       def lockForUpdate(s: DbSession, id: String) = None
       def setStatus(s: DbSession, id: String, status: AppointmentStatus, cancelReason: Option[String]) = ()
       def recordEvent(s: DbSession, e: AppointmentEvent) = ()

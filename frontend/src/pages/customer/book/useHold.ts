@@ -34,25 +34,64 @@ export function useHold(request: HoldRequest, slotStart: string | undefined) {
     idemKey.current = crypto.randomUUID();
   }, [slotStart, request.vehicleId, request.packageId, request.dealershipId, request.consultationRequestId]);
 
+  // Guards against a second press while the first is still on its way. Refs, not state:
+  // several clicks can arrive before React re-renders and disables anything.
+  // `attempt` numbers hold attempts; an answer for an attempt the customer has since left
+  // (released, or replaced by another time) is given back to the server straight away.
+  // `settling` queues each hold behind the cancels of the ones before it: the server keeps
+  // one live appointment per vehicle, so a new hold sent while the old one still stands
+  // would be refused.
+  const attempt = useRef(0);
+  const holding = useRef<string | null>(null);
+  const confirming = useRef(false);
+  const settling = useRef<Promise<unknown>>(Promise.resolve());
+  const mine = useRef(new Set<string>());
+  const cancelHold = (id: string) =>
+    post(`/api/appointments/${id}/cancel`, { reason: 'Customer changed the time' })
+      .catch(() => undefined)
+      .finally(() => qc.invalidateQueries({ queryKey: keys.myAppointments }));
+
   const hold = useMutation({
-    mutationFn: (s: Slot) =>
-      post<Appointment>(
-        '/api/appointments/holds',
-        {
-          dealershipId: request.dealershipId,
-          vehicleId: request.vehicleId,
-          start: s.start,
-          ...(request.consultationRequestId ? { consultationRequestId: request.consultationRequestId } : { packageId: request.packageId }),
-          customerNote: request.note || undefined,
-        },
-        { 'Idempotency-Key': idemKey.current },
-      ),
-    onSuccess: (a) => {
+    mutationFn: ({ slot, n, key }: { slot: Slot; n: number; key: string }) => {
+      const run = settling.current.then(async () => {
+        const a = await post<Appointment>(
+          '/api/appointments/holds',
+          {
+            dealershipId: request.dealershipId,
+            vehicleId: request.vehicleId,
+            start: slot.start,
+            ...(request.consultationRequestId ? { consultationRequestId: request.consultationRequestId } : { packageId: request.packageId }),
+            customerNote: request.note || undefined,
+          },
+          { 'Idempotency-Key': key },
+        );
+        mine.current.add(a.id);
+        if (n !== attempt.current) {
+          await cancelHold(a.id);
+          return null;
+        }
+        return a;
+      });
+      settling.current = run.catch(() => undefined);
+      return run.then((a) => ({ a, n }));
+    },
+    onSuccess: ({ a, n }) => {
+      if (!a) return;
+      if (n !== attempt.current) {
+        settling.current = settling.current.then(() => cancelHold(a.id));
+        return;
+      }
       setHeld(a);
       setLapsed(false);
       refreshAvailability();
     },
-    onError: (err) => {
+    onSettled: (_data, _err, { n }) => {
+      if (n === attempt.current) holding.current = null;
+    },
+    onError: (err, { n }) => {
+      if (n !== attempt.current) return;
+      // Booked or held meanwhile (another tab): the page then shows which appointment and how to free it.
+      if (err instanceof ApiError && err.code === 'VEHICLE_HAS_APPOINTMENT') qc.invalidateQueries({ queryKey: keys.myAppointments });
       if (err instanceof ApiError && err.code === 'SLOT_UNAVAILABLE') {
         setAlternatives(((err.details as { alternatives?: Slot[] })?.alternatives ?? []) as Slot[]);
         refreshAvailability();
@@ -60,8 +99,11 @@ export function useHold(request: HoldRequest, slotStart: string | undefined) {
     },
   });
 
-  const confirm = useMutation({
-    mutationFn: () => post<Appointment>(`/api/appointments/${held!.id}/confirm`),
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => post<Appointment>(`/api/appointments/${id}/confirm`),
+    onSettled: () => {
+      confirming.current = false;
+    },
     onSuccess: (a) => {
       setHeld(null);
       setBooked(a);
@@ -86,21 +128,38 @@ export function useHold(request: HoldRequest, slotStart: string | undefined) {
 
   /** Gives the held time back (the customer went back to change something). */
   const release = () => {
+    attempt.current += 1; // a hold still on its way is given back when it arrives
+    holding.current = null;
     if (held) {
-      post(`/api/appointments/${held.id}/cancel`, { reason: 'Customer changed the time' }).catch(() => undefined);
+      const id = held.id;
+      settling.current = settling.current.then(() => cancelHold(id));
       setHeld(null);
       refreshAvailability();
     }
     hold.reset();
   };
 
-  /** Releases any earlier hold and tries to hold this time. */
+  /** Releases any earlier hold and tries to hold this time. Further presses for the same time are ignored until it is answered. */
   const placeHold = (s: Slot) => {
+    if (holding.current === s.start) return;
     release();
+    holding.current = s.start;
     idemKey.current = crypto.randomUUID();
     setAlternatives(null);
     setLapsed(false);
-    hold.mutate(s);
+    hold.mutate({ slot: s, n: attempt.current, key: idemKey.current });
+  };
+
+  /** Confirms the held time once, however often Confirm is pressed. */
+  const confirm = {
+    mutate: () => {
+      if (!held || confirming.current) return;
+      confirming.current = true;
+      confirmMutation.mutate(held.id);
+    },
+    isPending: confirmMutation.isPending,
+    error: confirmMutation.error,
+    reset: confirmMutation.reset,
   };
 
   /** The customer picked another time on the grid: forget the last race and the last confirm error. */
@@ -115,5 +174,8 @@ export function useHold(request: HoldRequest, slotStart: string | undefined) {
     setLapsed(true);
   };
 
-  return { held, booked, alternatives, lapsed, hold, confirm, placeHold, release, slotChanged, lapse };
+  /** Whether this page placed that appointment (its own hold must not count as the vehicle being taken). */
+  const isMine = (id: string) => mine.current.has(id);
+
+  return { held, booked, alternatives, lapsed, hold, confirm, placeHold, release, slotChanged, lapse, isMine };
 }

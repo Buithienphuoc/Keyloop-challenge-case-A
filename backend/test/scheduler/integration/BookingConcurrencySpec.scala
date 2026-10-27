@@ -89,6 +89,111 @@ class BookingConcurrencySpec extends AnyFunSpec with Matchers with BeforeAndAfte
   }
 
   /**
+   * One customer, one vehicle, many presses: a double or triple tap on a slow page, a
+   * second tab, a retry after a network blip. Whatever the keys, the vehicle ends up with
+   * exactly one live appointment, because the vehicle EXCLUDE constraint covers holds too.
+   */
+  describe("one customer pressing Book many times before the first press is saved") {
+    // Presses for one vehicle queue on a lock instead of deadlocking inside the vehicle
+    // constraint; before that lock, 50 presses could take PostgreSQL minutes to untangle.
+    def fireAll(n: Int)(send: Int => Future[Response]): Seq[Response] =
+      given ExecutionContext = h.components.executionContext
+      val started = System.nanoTime()
+      val responses = Await.result(Future.sequence((0 until n).map(send)), 2.minutes)
+      (System.nanoTime() - started).nanos.toSeconds should be < 15L
+      responses
+
+    def liveFor(vehicleId: String): Int = h.sql {
+      SQL"""SELECT count(*)::int FROM appointments
+            WHERE vehicle_id = $vehicleId::uuid AND status IN ('HELD', 'CONFIRMED', 'IN_PROGRESS')"""
+        .as(SqlParser.scalar[Int].single)
+    }
+
+    def code(r: Response) = (r.json \ "error" \ "code").asOpt[String]
+
+    // Capacity 3, so only the vehicle rule can stop the extra presses.
+    it("bookings with a new Idempotency-Key per press: one is booked, the rest are refused") {
+      val f = fixture("TAP-KEYS", 3, 3, 1)
+      val c = f.customers.head
+      val responses = fireAll(Racers)(i =>
+        h.request("POST", "/api/appointments", Some(c.token), Some(bookingBody(f, c)), Seq("Idempotency-Key" -> s"tap-key-$i-0000")))
+      responses.count(_.status == 201) shouldBe 1
+      responses.filter(_.status == 409).flatMap(code).toSet shouldBe Set("VEHICLE_HAS_APPOINTMENT")
+      responses.count(_.status == 409) shouldBe (Racers - 1)
+      liveFor(c.vehicleId) shouldBe 1
+    }
+
+    it("bookings with no Idempotency-Key at all: still one") {
+      val f = fixture("TAP-NOKEY", 3, 3, 1)
+      val c = f.customers.head
+      val responses = fireAll(Racers)(_ => h.request("POST", "/api/appointments", Some(c.token), Some(bookingBody(f, c))))
+      responses.count(_.status == 201) shouldBe 1
+      responses.map(_.status).filterNot(s => s == 201 || s == 409) shouldBe empty
+      liveFor(c.vehicleId) shouldBe 1
+    }
+
+    it("holds from several tabs, each with its own key: one hold, the rest are refused") {
+      val f = fixture("TAP-HOLD", 3, 3, 1)
+      val c = f.customers.head
+      val responses = fireAll(Racers)(i =>
+        h.request("POST", "/api/appointments/holds", Some(c.token), Some(bookingBody(f, c)), Seq("Idempotency-Key" -> s"hold-key-$i-000")))
+      responses.count(_.status == 201) shouldBe 1
+      responses.filter(_.status == 409).flatMap(code).toSet shouldBe Set("VEHICLE_HAS_APPOINTMENT")
+      responses.count(_.status == 409) shouldBe (Racers - 1)
+      liveFor(c.vehicleId) shouldBe 1
+    }
+
+    it("a hold and a direct booking at the same moment: one of them") {
+      val f = fixture("TAP-MIX", 3, 3, 1)
+      val c = f.customers.head
+      val responses = fireAll(Racers)(i =>
+        h.request("POST", if i % 2 == 0 then "/api/appointments/holds" else "/api/appointments", Some(c.token), Some(bookingBody(f, c))))
+      responses.count(_.status == 201) shouldBe 1
+      liveFor(c.vehicleId) shouldBe 1
+    }
+
+    it("overlapping start times from two tabs (09:00 and 09:30): one of them") {
+      val f = fixture("TAP-SHIFT", 3, 3, 1)
+      val c = f.customers.head
+      val responses = fireAll(Racers)(i =>
+        val start = if i % 2 == 0 then SlotStart else "2026-11-03T09:30:00+07:00"
+        h.request("POST", "/api/appointments", Some(c.token), Some(bookingBody(f, c) ++ Json.obj("start" -> start))))
+      responses.count(_.status == 201) shouldBe 1
+      liveFor(c.vehicleId) shouldBe 1
+    }
+
+    it("Confirm pressed 50 times on one hold: one confirmation, one audit row, the same appointment every time") {
+      val f = fixture("TAP-CONFIRM", 2, 2, 1)
+      val c = f.customers.head
+      val held = h.api("POST", "/api/appointments/holds", c.token, bookingBody(f, c))
+      held.status shouldBe 201
+      val id = (held.json \ "id").as[String]
+      val responses = fireAll(Racers)(_ => h.request("POST", s"/api/appointments/$id/confirm", Some(c.token)))
+      all(responses.map(_.status)) shouldBe 200
+      all(responses.map(r => (r.json \ "status").as[String])) shouldBe "CONFIRMED"
+      responses.map(r => (r.json \ "id").as[String]).toSet shouldBe Set(id)
+      liveFor(c.vehicleId) shouldBe 1
+      h.sql {
+        SQL"""SELECT count(*)::int FROM appointment_events
+              WHERE appointment_id = $id::uuid AND from_status = 'HELD' AND to_status = 'CONFIRMED'"""
+          .as(SqlParser.scalar[Int].single)
+      } shouldBe 1
+    }
+
+    it("two vehicles of the same customer may still be booked side by side") {
+      val f = fixture("TAP-TWO", 3, 3, 1)
+      val c = f.customers.head
+      val second = h.idOf(SQL"""
+        INSERT INTO vehicles (owner_id, vehicle_type, make, model, plate)
+        SELECT owner_id, 'MOTORBIKE', 'Honda', 'Vision', 'TAP-TWO-B' FROM vehicles WHERE id = ${c.vehicleId}::uuid RETURNING id""")
+      val responses = fireAll(2)(i =>
+        val body = if i == 0 then bookingBody(f, c) else bookingBody(f, c) ++ Json.obj("vehicleId" -> second)
+        h.request("POST", "/api/appointments", Some(c.token), Some(body)))
+      responses.map(_.status) shouldBe Seq(201, 201)
+    }
+  }
+
+  /**
    * Each EXCLUDE constraint is checked on its own, by writing straight to the table.
    * (Mutation testing showed why: in the race tests every request picks the same first
    * bay, so the bay constraint alone was enough to make them pass. Without these direct

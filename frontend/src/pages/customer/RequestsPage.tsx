@@ -1,14 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { post } from '../../api/client';
-import { keys, useMyRequests, useReferenceData } from '../../api/hooks';
-import type { Consultation } from '../../api/types';
+import { keys, useBusyVehicles, useMyRequests, useReferenceData } from '../../api/hooks';
+import type { Appointment, Consultation } from '../../api/types';
+import { BusyNote } from '../../components/BusyVehicle';
 import { Empty, ErrorNote, Loading, PageHead, Plate, RequestPill } from '../../components/ui';
 import { dt, duration, money, stamp, time, vehicleName } from '../../lib/format';
 
 export function RequestsPage() {
   const [params] = useSearchParams();
   const requests = useMyRequests();
+  const busy = useBusyVehicles();
   const ref = useReferenceData();
   const areaName = (code: string) => ref.data?.inspectionAreas.find((a) => a.code === code)?.name ?? code;
 
@@ -38,14 +40,14 @@ export function RequestsPage() {
       )}
       <div className="list">
         {requests.data?.map((r) => (
-          <RequestItem key={r.id} r={r} areaName={areaName} />
+          <RequestItem key={r.id} r={r} areaName={areaName} taken={busy.get(r.vehicle.id)} />
         ))}
       </div>
     </div>
   );
 }
 
-function RequestItem({ r, areaName }: { r: Consultation; areaName: (c: string) => string }) {
+function RequestItem({ r, areaName, taken }: { r: Consultation; areaName: (c: string) => string; taken?: Appointment }) {
   const qc = useQueryClient();
   const withdraw = useMutation({
     mutationFn: () => post(`/api/consultations/${r.id}/cancel`),
@@ -80,19 +82,25 @@ function RequestItem({ r, areaName }: { r: Consultation; areaName: (c: string) =
         </div>
       )}
       <ErrorNote error={withdraw.error} />
+      {r.status === 'APPROVED' && taken && <BusyNote appointment={taken} />}
       <div className="row">
-        {r.status === 'APPROVED' && (
-          <Link className="btn btn-primary" to={`/book?request=${r.id}`}>
-            Pick a time
-          </Link>
-        )}
+        {r.status === 'APPROVED' &&
+          (taken ? (
+            <button className="btn btn-primary" disabled>
+              Pick a time
+            </button>
+          ) : (
+            <Link className="btn btn-primary" to={`/book?request=${r.id}`}>
+              Pick a time
+            </Link>
+          ))}
         {r.status === 'BOOKED' && r.appointment && (
           <Link className="btn" to="/appointments">
             Booked for {dt(r.appointment.start).toFormat('ccc d LLL')} at {time(r.appointment.start)}
           </Link>
         )}
         {(r.status === 'SUBMITTED' || r.status === 'APPROVED') && (
-          <button className="btn btn-ghost" disabled={withdraw.isPending} onClick={() => withdraw.mutate()}>
+          <button className="btn btn-ghost" disabled={withdraw.isPending || withdraw.isSuccess} onClick={() => withdraw.mutate()}>
             Withdraw request
           </button>
         )}

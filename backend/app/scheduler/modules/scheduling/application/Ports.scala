@@ -93,6 +93,9 @@ final case class AppointmentEvent(
 
 final case class WorkshopResources(bays: Seq[Bay], technicians: Seq[Technician])
 
+/** The appointment that still claims a vehicle (on hold, booked or in the workshop). */
+final case class LiveAppointment(reference: String, status: AppointmentStatus, start: Instant)
+
 /** A hold that ran out and was released (its consultation, if any, must be reopened). */
 final case class ExpiredHold(appointmentId: String, consultationRequestId: Option[String])
 
@@ -142,6 +145,10 @@ trait AppointmentWriter:
 
   /** Serialises transactions that use the same customer + Idempotency-Key (held until commit). */
   def lockIdempotencyKey(s: DbSession, customerId: String, key: String): Unit
+  /** Queues booking attempts for one vehicle until the current transaction ends. */
+  def lockVehicle(s: DbSession, vehicleId: String): Unit
+  /** The vehicle's appointment that is on a hold that has not run out, booked or in the workshop, if any. */
+  def liveAppointmentOf(s: DbSession, vehicleId: String, asOf: Instant): Option[LiveAppointment]
 
   /** Row-locks an appointment for a status change. */
   def lockForUpdate(s: DbSession, id: String): Option[LockedAppointment]
