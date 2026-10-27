@@ -16,6 +16,7 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
     { to: '/staff/advisor-appointments', label: 'Appointments' },
     { to: '/services/open', label: 'New services' },
     { to: '/staff/board', label: 'Workshop day' },
+    { to: '/staff/appointments', label: 'All appointments' },
     { to: '/staff/requests', label: 'Advice requests' },
     { to: '/staff/workload', label: 'Workload' },
     { to: '/parts', label: 'Parts' },
@@ -24,6 +25,7 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
     { to: '/staff/board', label: 'Workshop day' },
     { to: '/staff/advisor-appointments', label: 'Appointments' },
     { to: '/admin/jobs', label: 'Jobs & payments' },
+    { to: '/staff/appointments', label: 'All appointments' },
     { to: '/staff/requests', label: 'Advice requests' },
     { to: '/staff/workload', label: 'Workload' },
     { to: '/parts', label: 'Parts' },
@@ -38,10 +40,13 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
   TECHNICIAN: [
     { to: '/services/open', label: 'New services' },
     { to: '/jobs', label: 'My jobs' },
+    { to: '/staff/appointments', label: 'All appointments' },
+    { to: '/staff/requests', label: 'Advice requests' },
     { to: '/parts', label: 'Parts' },
   ],
   SYSTEM_MANAGER: [
     { to: '/system', label: 'Dealerships' },
+    { to: '/system/people', label: 'People' },
     { to: '/system/packages', label: 'Service packages' },
   ],
 };

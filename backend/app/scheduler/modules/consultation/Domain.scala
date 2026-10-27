@@ -88,7 +88,8 @@ trait ConsultationRepository:
   def insert(c: NewConsultation): String
   def get(id: String): Option[ConsultationView]
   def listByCustomer(customerId: String): Seq[ConsultationView]
-  def listByDealership(dealershipId: String, status: Option[ConsultationStatus]): Seq[ConsultationView]
+  /** `dealershipId` None = every dealership. */
+  def listByDealership(dealershipId: Option[String], status: Option[ConsultationStatus]): Seq[ConsultationView]
 
   /** Row-locks the request for review. */
   def lockForReview(s: DbSession, id: String): Option[ReviewTarget]

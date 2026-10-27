@@ -78,6 +78,7 @@ class IdentitySpec extends AnyFunSpec with Matchers:
     def findByEmail(email: String): Option[StoredUser] = byEmail.get(email.toLowerCase)
     def findById(id: String): Option[PublicUser] = byEmail.values.map(_.user).find(_.id == id)
     def listByDealership(dealershipId: String): Seq[StaffMember] = Nil
+    def listByRoles(roles: Set[Role]): Seq[StaffMember] = Nil
 
   private final class FakeSessions extends SessionRepository:
     val live = mutable.Map.empty[String, (String, Instant)]

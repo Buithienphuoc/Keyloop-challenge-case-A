@@ -1,6 +1,6 @@
 package scheduler.modules.identity.application
 
-import scheduler.modules.identity.{PublicUser, StaffMember}
+import scheduler.modules.identity.{PublicUser, Role, StaffMember}
 import scheduler.shared.DbSession
 
 /**
@@ -12,3 +12,4 @@ trait UserAccounts:
   /** Creates an account; pass `s` to include it in your own transaction. 409 on a duplicate email. */
   def createUser(input: CreateUser, s: Option[DbSession] = None): PublicUser
   def listStaff(dealershipId: String): Seq[StaffMember]
+  def listByRoles(roles: Set[Role]): Seq[StaffMember]

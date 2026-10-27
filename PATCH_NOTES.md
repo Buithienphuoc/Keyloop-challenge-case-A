@@ -13,6 +13,21 @@ Entry format:
 
 ## Unreleased
 
+### #24 Who sees what: every workshop for advisors, technicians and admins (`feat/role-permissions`)
+- **Changed:** service advisors, technicians and dealership admins read every appointment and
+  advice request of every workshop, and may move its status within the lifecycle rules (a
+  technician starts and finishes jobs, also ones assigned to someone else; only an admin records
+  the payment). Nothing can be deleted: cancelling is a status. Workshop controllers and parts
+  staff still see only their own workshop. Customers still see only what they created, and
+  choose the workshop when they book.
+- **Added:** "All appointments" (`GET /api/appointments?dealershipId=all|<id>&status=`) for
+  advisors, technicians and admins: their own workshop by default, another one, or all.
+- **Added:** Advice requests has a workshop filter (`GET /api/staff/consultations?dealershipId=`)
+  and is open to technicians, who may also review a request.
+- **Added:** "People" for the system manager (`GET /api/system/users?role=`): every customer,
+  advisor, technician and admin; workshops stay on "Dealerships".
+- **Tests:** unit and API tests for the new rules; Selenium suite `RolePermissionsSpec`.
+
 ### #23 Separate service jobs from advisor appointments (`feature/services-and-advisor-appointments`)
 - **Added:** an **appointment** is now a meeting with a service advisor: customer, time,
   workshop, the message to be advised and the advisor. Customers book one under "Meet an
@@ -32,6 +47,7 @@ Entry format:
 - **Upgrade notes:** migration V4 is additive. It adds `technician_assigned_at` /
   `technician_assigned_by` to `appointments` and marks every existing job as assigned (so prod
   jobs keep their technician and do not reappear as open), and creates `advisor_appointments`.
+
 ### #22 New bookings show on the advisor's board (`fix/advisor-board-upcoming`)
 - **Fixed:** a booking made by a customer seemed missing for the advisor. The board opens on
   today, and customers can only book from a little ahead (usually the next working day), so the

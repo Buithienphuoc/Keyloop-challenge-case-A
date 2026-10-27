@@ -27,6 +27,8 @@ trait UserRepository:
   def findByEmail(email: String): Option[StoredUser]
   def findById(id: String): Option[PublicUser]
   def listByDealership(dealershipId: String): Seq[StaffMember]
+  /** Every account in one of `roles`, by role then name. */
+  def listByRoles(roles: Set[Role]): Seq[StaffMember]
 
 /** Port: login sessions, stored as token hashes. */
 trait SessionRepository:

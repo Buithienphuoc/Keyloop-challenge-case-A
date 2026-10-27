@@ -36,7 +36,7 @@ class ConsultationServiceSpec extends AnyFunSpec with Matchers:
         ConsultationView.CustomerRef(c.customerId, "C", None, "c@x"), None, None, None, None, None, None, Instant.EPOCH, None, None)
     }
     def listByCustomer(customerId: String): Seq[ConsultationView] = Nil
-    def listByDealership(dealershipId: String, status: Option[ConsultationStatus]): Seq[ConsultationView] = Nil
+    def listByDealership(dealershipId: Option[String], status: Option[ConsultationStatus]): Seq[ConsultationView] = Nil
     def lockForReview(s: DbSession, id: String): Option[ReviewTarget] =
       rows.get(id).map((c, status) => ReviewTarget(status, c.dealershipId, c.kind, vehicleType))
     def approve(s: DbSession, id: String, a: Approval): Unit =
@@ -119,19 +119,25 @@ class ConsultationServiceSpec extends AnyFunSpec with Matchers:
       f.repo.approval shouldBe empty
     }
 
-    it("keeps advisors to their own dealership") {
+    it("lets advisors, technicians and admins of another dealership review it, but not other staff") {
+      for role <- Seq(Role.SERVICE_ADVISOR, Role.TECHNICIAN, Role.ADMIN) do
+        val f = Fixture()
+        val id = f.submit().id
+        f.service.review(auth(role, dealershipId = Some("d2")), id, approve, Log.silent).id shouldBe id
       val f = Fixture()
       val id = f.submit().id
-      statusOf(f.service.review(auth(Role.SERVICE_ADVISOR, dealershipId = Some("d2")), id, approve, Log.silent)) shouldBe 403
+      statusOf(f.service.review(auth(Role.WORKSHOP_CONTROLLER, dealershipId = Some("d2")), id, approve, Log.silent)) shouldBe 403
     }
   }
 
   describe("getVisible and cancel") {
-    it("hides other customers' requests behind a 404 and keeps staff to their dealership") {
+    it("hides other customers' requests behind a 404 and shows them to advisors of every dealership") {
       val f = Fixture()
       val id = f.submit().id
       statusOf(f.service.getVisible(customer.copy(userId = "u2"), id)) shouldBe 404
-      statusOf(f.service.getVisible(auth(Role.SERVICE_ADVISOR, dealershipId = Some("d2")), id)) shouldBe 403
+      f.service.getVisible(auth(Role.SERVICE_ADVISOR, dealershipId = Some("d2")), id).id shouldBe id
+      f.service.getVisible(auth(Role.TECHNICIAN, dealershipId = Some("d2")), id).id shouldBe id
+      statusOf(f.service.getVisible(auth(Role.PARTS_STAFF, dealershipId = Some("d2")), id)) shouldBe 403
       f.service.getVisible(advisor, id).id shouldBe id
     }
 

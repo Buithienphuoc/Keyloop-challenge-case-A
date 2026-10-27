@@ -131,8 +131,8 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       get("/api/staff/appointments/upcoming", customer).status shouldBe 403
     }
 
-    it("never lets another dealership see the appointment") {
-      get(s"/api/appointments/$appointmentId", advisorTD).status shouldBe 403
+    it("lets advisors of every dealership see the appointment, but never another customer") {
+      get(s"/api/appointments/$appointmentId", advisorTD).status shouldBe 200
       val nosy = post("/api/auth/register", body = Json.obj("email" -> "nosy@demo.vn", "password" -> "Secret123", "fullName" -> "Nosy")).str("token")
       get(s"/api/appointments/$appointmentId", nosy).status shouldBe 404
     }
@@ -324,7 +324,7 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       late.errorCode shouldBe "INVALID_STATUS_TRANSITION"
     }
 
-    it("UC41: a technician cannot start a job assigned to another technician") {
+    it("UC41: a technician may start a job assigned to another technician (every job is open to them)") {
       val created = post("/api/admin/technicians", adminD1, Json.obj("displayName" -> "Đinh Văn Phúc", "skills" -> Seq("ELECTRICAL"),
         "shiftStart" -> "08:00", "shiftEnd" -> "17:30", "workDays" -> Seq(1, 2, 3, 4, 5, 6),
         "login" -> Json.obj("email" -> "tech.phuc@demo.vn", "password" -> "Secret123")))
@@ -332,7 +332,49 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       val phuc = h.login("tech.phuc@demo.vn", "Secret123")
       val job = h.idOf(SQL"""SELECT a.id FROM appointments a JOIN technicians t ON t.id = a.technician_id
         WHERE t.display_name = 'Nguyễn Văn Minh' AND a.status = 'CONFIRMED' LIMIT 1""")
-      post(s"/api/appointments/$job/status", phuc, Json.obj("status" -> "IN_PROGRESS")).status shouldBe 403
+      val started = post(s"/api/appointments/$job/status", phuc, Json.obj("status" -> "IN_PROGRESS"))
+      started.status shouldBe 200
+      started.str("status") shouldBe "IN_PROGRESS"
+    }
+
+    it("lists every appointment of every dealership for advisors, technicians and admins, and nobody can delete one") {
+      val own = get("/api/appointments", advisorTD)
+      own.status shouldBe 200
+      own.json.as[Seq[JsObject]].map(o => (o \ "dealership" \ "id").as[String]).distinct.foreach(_ shouldBe td)
+      for token <- Seq(advisorTD, techHung, adminD1) do
+        val all = get("/api/appointments?dealershipId=all", token)
+        all.status shouldBe 200
+        all.json.as[Seq[JsObject]].map(o => (o \ "dealership" \ "id").as[String]).toSet should contain(d1)
+      get(s"/api/appointments?dealershipId=$d1&status=CONFIRMED", advisorTD).json.as[Seq[JsObject]]
+        .map(o => (o \ "status").as[String]).distinct shouldBe Seq("CONFIRMED")
+      get("/api/appointments?dealershipId=all", customer).status shouldBe 403
+      get("/api/appointments?dealershipId=nope", advisorTD).status shouldBe 400
+      val any = get("/api/appointments?dealershipId=all", adminD1).ids.head
+      h.api("DELETE", s"/api/appointments/$any", adminD1).status shouldBe 404
+      get(s"/api/appointments/$any", adminD1).status shouldBe 200
+    }
+
+    it("shows the consultation queue of every dealership to advisors, technicians and admins") {
+      get("/api/staff/consultations", techHung).status shouldBe 200
+      val all = get("/api/staff/consultations?dealershipId=all", advisorTD)
+      all.status shouldBe 200
+      all.json.as[Seq[JsObject]].map(o => (o \ "dealership" \ "id").as[String]).toSet should contain(d1)
+      get(s"/api/staff/consultations?dealershipId=$d1", advisorTD).ids shouldBe get("/api/staff/consultations", advisorD1).ids
+      get("/api/staff/consultations?dealershipId=all", customer).status shouldBe 403
+    }
+
+    it("lets the system manager list customers, advisors, technicians and admins") {
+      val everyone = get("/api/system/users", sys)
+      everyone.status shouldBe 200
+      val people = everyone.json.as[Seq[JsObject]]
+      people.map(p => (p \ "role").as[String]).toSet shouldBe Set("CUSTOMER", "SERVICE_ADVISOR", "TECHNICIAN", "ADMIN")
+      people.map(p => (p \ "email").as[String]) should contain allOf ("customer@demo.vn", "advisor.d1@demo.vn", "tech.hung@demo.vn", "admin.d1@demo.vn")
+      people.find(p => (p \ "email").as[String] == "advisor.td@demo.vn").map(p => (p \ "dealershipId").as[String]) shouldBe Some(td)
+      people.foreach(p => p.keys should not contain "passwordHash")
+      for role <- Seq("CUSTOMER", "SERVICE_ADVISOR", "TECHNICIAN", "ADMIN") do
+        get(s"/api/system/users?role=$role", sys).json.as[Seq[JsObject]].map(p => (p \ "role").as[String]).distinct shouldBe Seq(role)
+      get("/api/system/users?role=SYSTEM_MANAGER", sys).status shouldBe 400
+      get("/api/system/users", adminD1).status shouldBe 403
     }
 
     it("UC61: the system manager sees every dealership with its live capacity") {

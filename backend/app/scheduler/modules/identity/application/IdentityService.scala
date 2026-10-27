@@ -83,3 +83,4 @@ final class IdentityService(db: Db, users: UserRepository, sessions: SessionRepo
     users.findById(userId).getOrElse(throw AppError.notFound("User"))
 
   def listStaff(dealershipId: String): Seq[StaffMember] = users.listByDealership(dealershipId)
+  def listByRoles(roles: Set[Role]): Seq[StaffMember] = users.listByRoles(roles)

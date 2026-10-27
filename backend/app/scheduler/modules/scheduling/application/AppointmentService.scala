@@ -2,10 +2,10 @@ package scheduler.modules.scheduling.application
 
 import java.time.{Instant, LocalDate}
 
-import scheduler.modules.identity.{AuthContext, Role, assertCanSee, requireDealership}
+import scheduler.modules.identity.{AuthContext, assertCanSee, listScope, requireDealership}
 import scheduler.modules.scheduling.domain.{AppointmentStatus, Lifecycle, LocalDay}
 import scheduler.modules.scheduling.domain.Lifecycle.TransitionError
-import scheduler.shared.{AppError, Db, DbSession, Log, Metrics}
+import scheduler.shared.{AppError, Db, Log, Metrics}
 
 object AppointmentService:
   /** How many bookings the board's "Coming up" list shows. */
@@ -38,8 +38,6 @@ final class AppointmentService(
   def get(auth: AuthContext, id: String): AppointmentView = db.run { s =>
     val view = reader.get(s, id).getOrElse(throw AppError.notFound("Appointment"))
     assertCanSee(auth, view.customer.id, view.dealership.id, "Appointment")
-    // A technician sees their own jobs, and the open ones they could take.
-    if view.technicianAssigned && !isOwnJobOrNotTechnician(s, auth, view.technician.id) then throw AppError.notFound("Appointment")
     view
   }
 
@@ -82,6 +80,14 @@ final class AppointmentService(
     val statuses = status.fold(AppointmentStatus.values.toSet - AppointmentStatus.HELD)(Set(_))
     db.run(reader.list(_, AppointmentFilter(dealershipId = Some(auth.requireDealership), statuses = statuses, newestFirst = true)))
 
+  /**
+   * Every appointment, newest first, for advisors, technicians and admins: their own dealership
+   * by default, or another one, or all of them ("all"). Holds still being confirmed are left out.
+   */
+  def listAll(auth: AuthContext, dealershipId: Option[String], status: Option[AppointmentStatus]): Seq[AppointmentView] =
+    val statuses = status.fold(AppointmentStatus.values.toSet - AppointmentStatus.HELD)(Set(_))
+    db.run(reader.list(_, AppointmentFilter(dealershipId = listScope(auth, dealershipId), statuses = statuses, newestFirst = true)))
+
   /** The signed-in technician's jobs for one local day. */
   def listTechnicianDay(auth: AuthContext, date: LocalDate): Seq[AppointmentView] = db.run { s =>
     (reader.technicianIdForUser(s, auth.userId), auth.dealershipId) match
@@ -95,7 +101,6 @@ final class AppointmentService(
     val from = db.tx { s =>
       val a = writer.lockForUpdate(s, id).getOrElse(throw AppError.notFound("Appointment"))
       assertCanSee(auth, a.customerId, a.dealershipId, "Appointment")
-      if !isOwnJobOrNotTechnician(s, auth, a.technicianId) then throw AppError.forbidden("This job is assigned to another technician")
 
       Lifecycle.checkTransition(a.status, to, auth.role, a.start.toEpochMilli, clock().toEpochMilli).foreach { error =>
         throw TransitionErrors(error)(a.status, to)
@@ -146,10 +151,6 @@ final class AppointmentService(
         log.info("booking.hold_confirmed", "appointmentId" -> id)
       case HoldOutcome.AlreadyConfirmed => ()
     reload(id)
-
-  /** Technicians only ever see and move the jobs assigned to them. */
-  private def isOwnJobOrNotTechnician(s: DbSession, auth: AuthContext, technicianId: String): Boolean =
-    auth.role != Role.TECHNICIAN || reader.technicianIdForUser(s, auth.userId).contains(technicianId)
 
   /** The appointment as it is after a committed change. */
   private def reload(id: String): AppointmentView =

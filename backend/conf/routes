@@ -17,6 +17,7 @@ POST    /api/me/vehicles                   scheduler.modules.vehicles.adapters.V
 
 # ---- scheduling ------------------------------------------------------------------------------
 GET     /api/availability                  scheduler.modules.scheduling.adapters.SchedulingController.availabilityForDay
+GET     /api/appointments                  scheduler.modules.scheduling.adapters.SchedulingController.listAll
 POST    /api/appointments                  scheduler.modules.scheduling.adapters.SchedulingController.book
 POST    /api/appointments/holds            scheduler.modules.scheduling.adapters.SchedulingController.hold
 POST    /api/appointments/:id/confirm      scheduler.modules.scheduling.adapters.SchedulingController.confirmHold(id: String)
@@ -65,6 +66,7 @@ POST    /api/admin/staff                   scheduler.modules.admin.adapters.Admi
 # ---- platform administration -----------------------------------------------------------------
 GET     /api/system/dealerships            scheduler.modules.system.adapters.SystemController.list
 POST    /api/system/dealerships            scheduler.modules.system.adapters.SystemController.onboard
+GET     /api/system/users                  scheduler.modules.system.adapters.SystemController.listPeople
 GET     /api/system/packages               scheduler.modules.system.adapters.SystemController.listPackages
 POST    /api/system/packages               scheduler.modules.system.adapters.SystemController.createPackage
 PATCH   /api/system/packages/:id           scheduler.modules.system.adapters.SystemController.updatePackage(id: String)

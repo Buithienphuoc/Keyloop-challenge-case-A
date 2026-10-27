@@ -36,6 +36,7 @@ class AdminServicesSpec extends AnyFunSpec with Matchers:
     def findByEmail(email: String): Option[StoredUser] = None
     def findById(id: String): Option[PublicUser] = None
     def listByDealership(dealershipId: String): Seq[StaffMember] = Nil
+    def listByRoles(roles: Set[Role]): Seq[StaffMember] = Nil
 
   private object NoSessions extends SessionRepository:
     def create(userId: String, tokenHash: String, expiresAt: java.time.Instant): Unit = ()
