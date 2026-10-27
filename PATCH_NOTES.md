@@ -32,6 +32,15 @@ Entry format:
 - **Upgrade notes:** migration V4 is additive. It adds `technician_assigned_at` /
   `technician_assigned_by` to `appointments` and marks every existing job as assigned (so prod
   jobs keep their technician and do not reappear as open), and creates `advisor_appointments`.
+### #22 New bookings show on the advisor's board (`fix/advisor-board-upcoming`)
+- **Fixed:** a booking made by a customer seemed missing for the advisor. The board opens on
+  today, and customers can only book from a little ahead (usually the next working day), so the
+  new job sat on a day the advisor had not opened. The board now has a "Coming up" list with the
+  dealership's next 20 confirmed bookings; one click opens a booking on its day.
+- **Added:** `GET /api/staff/appointments/upcoming` (advisor, admin, workshop controller).
+- **Changed:** the board's side list says "Jobs this day" when it is not showing today.
+- **Tests:** a unit and an API test for the new list, and the Selenium suite `BoardUpcomingSpec`.
+
 ### #21 Pressing Book many times never books twice (`fix/double-booking`)
 - **Fixed:** several bookings or holds for the same vehicle at once (a double tap, two tabs, a
   retry without an Idempotency-Key) waited on each other inside the database and took one to
