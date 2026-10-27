@@ -10,12 +10,12 @@ rectangle "Unified Service Scheduler" {
   usecase "UC02 Sign in / sign out" as UC02
   usecase "UC03 Manage my vehicles" as UC03
   usecase "UC04 Book a maintenance package" as UC04
-  usecase "UC05 Ask for an inspection\non request" as UC05
-  usecase "UC06 Ask for a customisation" as UC06
-  usecase "UC07 Book an approved request" as UC07
-  usecase "UC08 View my appointments\nand requests" as UC08
+  usecase "UC05 Ask for an inspection\non request" as UC05 <<off>>
+  usecase "UC06 Ask for a customisation" as UC06 <<off>>
+  usecase "UC07 Book an approved request" as UC07 <<off>>
+  usecase "UC08 View my appointments" as UC08
   usecase "UC09 Cancel an appointment" as UC09
-  usecase "UC10 Withdraw a request" as UC10
+  usecase "UC10 Withdraw a request" as UC10 <<off>>
   usecase "UC11 Add an appointment\nto my calendar" as UC11
   usecase "UC12 Hold a time for 10 minutes,\nthen confirm it" as UC12
 
@@ -33,12 +33,12 @@ Customer -- UC01
 Customer -- UC02
 Customer -- UC03
 Customer -- UC04
-Customer -- UC05
-Customer -- UC06
-Customer -- UC07
+Customer -[#B5BFBB]- UC05
+Customer -[#B5BFBB]- UC06
+Customer -[#B5BFBB]- UC07
 Customer -- UC08
 Customer -- UC09
-Customer -- UC10
+Customer -[#B5BFBB]- UC10
 Customer -- UC11
 Customer .. F02
 Customer .. F03
@@ -46,18 +46,18 @@ Customer .. F03
 Customer -- UC12
 
 UC04 ..> UC12 : <<include>>
-UC07 ..> UC12 : <<include>>
+UC07 .[#B5BFBB].> UC12 : <<include>>
 UC04 ..> UC20 : <<include>>
 UC04 ..> UC21 : <<include>>
-UC07 ..> UC20 : <<include>>
-UC07 ..> UC21 : <<include>>
+UC07 .[#B5BFBB].> UC20 : <<include>>
+UC07 .[#B5BFBB].> UC21 : <<include>>
 UC22 ..> UC04 : <<extend>>\nslot taken meanwhile
-UC22 ..> UC07 : <<extend>>
-UC05 ..> UC07 : <<precedes>>\nafter advisor approval
-UC06 ..> UC07 : <<precedes>>
+UC22 .[#B5BFBB].> UC07 : <<extend>>
+UC05 .[#B5BFBB].> UC07 : <<precedes>>\nafter advisor approval
+UC06 .[#B5BFBB].> UC07 : <<precedes>>
 
 legend bottom right
-  Solid: implemented    Dashed grey: future work
-  Replacement parts are ordered by staff for a job (see the staff diagram).
+  Blue: in this version    Solid grey: not in this version (needs a service advisor)
+  Dashed grey: future work, not built
 endlegend
 @enduml

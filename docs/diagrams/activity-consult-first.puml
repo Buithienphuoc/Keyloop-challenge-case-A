@@ -1,54 +1,56 @@
 @startuml activity-consult-first
 !include _style.iuml
-title Activity — inspection on request / customisation (UC05, UC06, UC31, UC07)
+skinparam ActivityDiamondBackgroundColor #F4F5F5
+skinparam ActivityDiamondFontColor #7D878C
+title Activity — inspection on request / customisation (UC05, UC06, UC31, UC07)\n<color:#7D878C>Not in this version: it needs a service advisor</color>
 
-|Customer|
-|Service advisor|
-|System|
-|Customer|
+|#EEF0F0|Customer|
+|#EEF0F0|Service advisor|
+|#EEF0F0|System|
+|#EEF0F0|Customer|
 start
-:Choose "Check something specific"
-or "Customise my vehicle";
-:Pick the vehicle and the areas,
-describe it in own words, pick a dealership;
-:Send to an advisor;
-|System|
-:Store the request: **SUBMITTED**,
-log consultation.submitted;
-|Service advisor|
-:Open the "Waiting for advice" queue;
-:Read the areas and the description;
+#EEF0F0:Choose "Check something specific"
+or "Customise my vehicle"; <<off>>
+#EEF0F0:Pick the vehicle and the areas,
+describe it in own words, pick a dealership; <<off>>
+#EEF0F0:Send to an advisor; <<off>>
+|#EEF0F0|System|
+#EEF0F0:Store the request: **SUBMITTED**,
+log consultation.submitted; <<off>>
+|#EEF0F0|Service advisor|
+#EEF0F0:Open the "Waiting for advice" queue; <<off>>
+#EEF0F0:Read the areas and the description; <<off>>
 if (Can the workshop do it?) then (no)
-  :Decline with a message to the customer;
+  #EEF0F0:Decline with a message to the customer; <<off>>
   |System|
-  :**REJECTED**;
+  #EEF0F0:**REJECTED**; <<off>>
   |Customer|
-  :Read the advisor's reason;
+  #EEF0F0:Read the advisor's reason; <<off>>
   stop
 else (yes)
   |Service advisor|
-  :Set time needed, skill, bay type,
-  estimate and a message, then approve;
+  #EEF0F0:Set time needed, skill, bay type,
+  estimate and a message, then approve; <<off>>
   note right
     The server checks the bay type fits the vehicle
     and the skill exists; if not → 422 and the
     advisor corrects it.
   end note
   |System|
-  :**APPROVED**, log consultation.reviewed;
+  #EEF0F0:**APPROVED**, log consultation.reviewed; <<off>>
 endif
-|Customer|
-:See the reply on Home and on Requests
-(duration, estimate, advisor's note);
+|#EEF0F0|Customer|
+#EEF0F0:See the reply on Home and on Requests
+(duration, estimate, advisor's note); <<off>>
 if (Book it?) then (withdraw)
   |System|
-  :**CANCELLED**;
+  #EEF0F0:**CANCELLED**; <<off>>
   stop
 else (pick a time)
   repeat
     |Customer|
-    :Pick a start time — only times with a bay of the
-    approved type and a technician with the approved skill;
+    #EEF0F0:Pick a start time — only times with a bay of the
+    approved type and a technician with the approved skill; <<off>>
     |System|
   repeat while (Still APPROVED and the slot still free?) is (slot taken: offer alternatives)
   -> yes;
@@ -56,27 +58,31 @@ else (pick a time)
     Already booked by another tab or device
     → 409 CONSULTATION_NOT_BOOKABLE
   end note
-  :In one transaction: appointment **HELD** for 10 minutes,
-  request **BOOKED**;
+  #EEF0F0:In one transaction: appointment **HELD** for 10 minutes,
+  request **BOOKED**; <<off>>
   |Customer|
-  :Review and press **Confirm booking**;
+  #EEF0F0:Review and press **Confirm booking**; <<off>>
   |System|
   if (Confirmed before the hold ran out?) then (yes)
-    :HELD → **CONFIRMED**;
+    #EEF0F0:HELD → **CONFIRMED**; <<off>>
   else (no)
-    :HELD → **EXPIRED**,
+    #EEF0F0:HELD → **EXPIRED**,
     request back to **APPROVED**
-    so another time can be picked;
+    so another time can be picked; <<off>>
     stop
   endif
 endif
-|Customer|
+|#EEF0F0|Customer|
 if (Cancels before the start?) then (yes)
   |System|
-  :Appointment CANCELLED,
+  #EEF0F0:Appointment CANCELLED,
   request back to **APPROVED**
-  so another time can be picked;
+  so another time can be picked; <<off>>
 else (no)
 endif
 stop
+legend bottom right
+  Solid grey: not in this version of the web app (the backend still has it).
+  The customer books a maintenance package instead (activity-book-package).
+endlegend
 @enduml

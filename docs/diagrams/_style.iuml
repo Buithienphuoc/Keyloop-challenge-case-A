@@ -20,3 +20,24 @@ skinparam StateBorderColor #1D4E89
 skinparam StateBackgroundColor #E6EEF7
 skinparam NoteBackgroundColor #FFFFFF
 skinparam NoteBorderColor #B5BFBB
+
+' <<off>>: built before the scope-down to three roles (customer, technician, system manager),
+' not in this version of the web app. Drawn solid grey; dashed grey stays "future work".
+skinparam usecase<<off>> {
+  BackgroundColor #EEF0F0
+  BorderColor #A7B0B4
+  FontColor #7D878C
+}
+skinparam actor<<off>> {
+  BackgroundColor #EEF0F0
+  BorderColor #A7B0B4
+  FontColor #7D878C
+}
+hide stereotype
+<style>
+.off {
+  BackgroundColor #EEF0F0
+  LineColor #A7B0B4
+  FontColor #7D878C
+}
+</style>

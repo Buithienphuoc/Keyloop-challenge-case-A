@@ -1,84 +1,82 @@
 @startuml activity-workshop-day
 !include _style.iuml
-title Activity — the workshop day (UC30, UC32–UC36, UC40–UC42)
+title Activity — the workshop day (UC40, UC41; grey: UC30, UC32–UC36, UC42)
 
-|Workshop controller|
-|Service advisor|
+|#EEF0F0|Workshop controller|
+|#EEF0F0|Service advisor|
 |Technician|
-|Dealership admin|
 |System|
-|Workshop controller|
+|#EEF0F0|Workshop controller|
 start
-:Open the day's workload
-(booked minutes per bay and technician);
+#EEF0F0:Open the day's workload
+(booked minutes per bay and technician); <<off>>
 if (A technician is off or a bay is down?) then (yes)
-  :Move the affected jobs to another bay
-  or technician, with a reason;
+  #EEF0F0:Move the affected jobs to another bay
+  or technician, with a reason; <<off>>
   |System|
-  :Check the bay or technician that changes: active,
+  #EEF0F0:Check the bay or technician that changes: active,
   right bay type, has the skill, on shift for the whole
   job; EXCLUDE has the last word
-  (busy → 409 RESOURCE_BUSY); audit row "Moved: …";
+  (busy → 409 RESOURCE_BUSY); audit row "Moved: …"; <<off>>
 else (no)
 endif
-|Service advisor|
-:Open the workshop day board
-(bays as rows, jobs placed by time);
-:Select a booking;
+|#EEF0F0|Service advisor|
+#EEF0F0:Open the workshop day board
+(bays as rows, jobs placed by time); <<off>>
+#EEF0F0:Select a booking; <<off>>
 note left
-  "Has the vehicle arrived?" is the advisor's call
-  at the desk. A CONFIRMED job may be started on any
-  day, also before the booked one: the vehicle can
-  arrive early (decided 27 Oct 2026, code review Q1).
+  "Has the vehicle arrived?" is decided at the desk.
+  A CONFIRMED job may be started on any day, also
+  before the booked one: the vehicle can arrive early
+  (decided 27 Oct 2026, code review Q1).
 end note
 if (Has the vehicle arrived?) then (yes)
-  :Hand the vehicle to the
-  assigned technician;
+  #EEF0F0:Hand the vehicle to the
+  assigned technician; <<off>>
   |Technician|
-  :Open "My jobs", read the service,
+  :Open "Service requests", read the service,
   the checklist and the customer's note;
   if (Parts needed?) then (yes)
-    :Order parts for the job
-    (parts staff order, receive and issue them);
+    #EEF0F0:Order parts for the job
+    (parts staff order, receive and issue them); <<off>>
   else (no)
   endif
   :Start job;
-  note right: The advisor can also start it from the board.
   |System|
   :CONFIRMED → **IN_PROGRESS**;
   |Technician|
   :Do the work;
   :Show the customer the vehicle;
   :Customer agrees: finish job;
-  note right: The advisor can also finish it from the board.
   |System|
   :IN_PROGRESS → **AWAITING_PAYMENT**
   (bay and technician freed; the customer
   sees "Awaiting payment");
-  |Dealership admin|
+  |Technician|
   :Customer pays at the desk;
-  :Jobs & payments: "Payment received";
+  :"Customer has paid, close job";
   note right
-    No bank integration in the demo:
-    the admin records the payment by hand.
-    Only the admin may close a job (else 403).
+    No bank integration in the demo: the payment
+    is recorded by hand. Only the assigned technician
+    (or a dealership admin, not in this version) may
+    close a job, else 403.
   end note
   |System|
   :AWAITING_PAYMENT → **COMPLETED**
   (the customer sees "Finished");
 else (no)
-  |Service advisor|
+  |#EEF0F0|Service advisor|
   if (Start time passed and\nthe customer did not come?) then (yes)
-    :Mark no-show;
+    #EEF0F0:Mark no-show; <<off>>
     |System|
-    :CONFIRMED → **NO_SHOW**
-    (bay and technician freed);
+    #EEF0F0:CONFIRMED → **NO_SHOW**
+    (bay and technician freed); <<off>>
   else (no: the booking must be dropped)
-    |Service advisor|
-    :Cancel the booking (before work starts);
+    |#EEF0F0|Service advisor|
+    #EEF0F0:Cancel the booking (before work starts); <<off>>
     |System|
-    :CONFIRMED → **CANCELLED**
-    (slot freed, a linked request re-opens);
+    #EEF0F0:CONFIRMED → **CANCELLED**
+    (slot freed); <<off>>
   endif
 endif
 |System|
@@ -90,4 +88,10 @@ note right
   job → 403. Nothing changes.
 end note
 stop
+
+legend bottom right
+  Blue: in this version    Solid grey: not in this version of the web app
+  (service advisor, workshop controller, dealership admin, parts staff;
+  the backend still has it). The customer can still cancel from My appointments.
+endlegend
 @enduml

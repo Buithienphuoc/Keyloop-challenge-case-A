@@ -225,6 +225,20 @@ customer's note), with large buttons to start, finish and close a job once the c
 (appointments of every dealership, bays and technicians, every customer's vehicle); people; the
 service package catalogue; onboarding a dealership.
 
+**Not in this version** (built and tested in the backend before the scope-down to three roles,
+no page in the web app; drawn solid grey in [the diagrams](docs/diagrams/README.md))
+- *Check something specific* and *Customise my vehicle*: the customer describes the problem or
+  idea; an advisor turns it into a schedulable job (duration, skill, bay type, estimate); the
+  customer then picks a time. Both use one "consult first, then book" flow.
+- *Service advisor*: a day board (bays × hours) with start / done / no-show / cancel; the
+  advice-request queue.
+- *Dealership admin*: bays (in or out of service), technicians with skills, shifts and working
+  days, staff accounts, opening hours (with a count of bookings that fall outside new hours).
+- *Workshop controller*: the day's load per bay and technician; move a job to another bay or
+  technician (the same database constraints refuse a clash).
+- *Parts staff*: stock list and parts orders (requested → ordered → received → issued), which an
+  advisor or technician can raise from a job; issuing takes stock and can never go below zero.
+
 ## Diagrams
 
 Use case, activity, state, data flow (context and level 1), class (domain model and application

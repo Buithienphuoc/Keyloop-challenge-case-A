@@ -24,3 +24,31 @@ Run: `docker compose --profile full up -d --build`, then `cd e2e && sbt test`. A
 | UC41 Start, finish and close a job | `BookingJourneySpec` › starts the job, finishes it, and closes it once paid |
 | UC60 Onboard a dealership | `OnboardingSpec` › onboards a dealership together with its first admin |
 | UC61 See every dealership and its data | `SystemManagerSpec`; `OnboardingSpec` › sees its capacity |
+
+## Not in this version
+
+Built and tested in the backend before the scope-down to three roles; drawn solid grey in
+[docs/diagrams](diagrams/README.md). Their pages and the Selenium tests that walked them
+(`ConsultFirstSpec`, `WorkshopDaySpec`, `RolePermissionsSpec`, `BoardUpcomingSpec`, the admin part
+of `AdminSpec`) were removed with the pages; the backend tests in the last column still run.
+
+| Use case | Backend test (`backend/test/scheduler/…`) |
+| --- | --- |
+| UC05 Ask for an inspection | `ApiSpec` › inspection on request |
+| UC06 Ask for a customisation | `ApiSpec` › customisation request |
+| UC07 Book an approved request | `ApiSpec` › the customer books it |
+| UC10 Withdraw a request | `ApiSpec` › UC10 |
+| UC30 Workshop day board | `ApiSpec` › shows it everywhere it should |
+| UC31 Review an advice request | `ApiSpec` › advisor turns it into a schedulable job |
+| UC32 Record start, finish, no-show (advisor) | `ApiSpec` › no-show only after start |
+| UC33 Cancel a booking (advisor) | `ApiSpec` › UC33 |
+| UC34 See the day's workload | `FeaturesSpec`, `WorkloadSpec` |
+| UC35 Move a job | `FeaturesSpec` › moves a job to a free, qualified technician |
+| UC36 Jobs by status, record payment (admin) | `ApiSpec` |
+| UC42 Order parts for a job | `FeaturesSpec` › lets a technician order parts for a job |
+| UC50 Manage service bays | `ApiSpec` › admin adds a bay |
+| UC51 Manage technicians | `ApiSpec` › admin adds a technician |
+| UC52 Manage staff accounts | none |
+| UC53 Opening hours and booking rules | `FeaturesSpec` › applies new hours to availability at once |
+| UC70 Manage parts stock | `FeaturesSpec` › keeps the shelf to parts staff and admins |
+| UC71 Fulfil parts orders | `FeaturesSpec` › never issues more than is on the shelf |

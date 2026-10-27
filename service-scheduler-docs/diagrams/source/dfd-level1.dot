@@ -9,11 +9,12 @@ digraph level1 {
   // External entities
   node [shape=box, style=filled, fillcolor="#F3F5F4", width=1.6, height=0.6];
   customer   [label="Customer"];
-  advisor    [label="Service advisor"];
+  advisor    [label="Service advisor", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
   technician [label="Technician"];
-  admin      [label="Dealership admin\n/ system manager"];
-  controller [label="Workshop controller"];
-  partsStaff [label="Parts staff"];
+  admin      [label="System manager"];
+  dealerAdmin [label="Dealership admin", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
+  controller [label="Workshop controller", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
+  partsStaff [label="Parts staff", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
   monitor    [label="Monitoring platform\n(Prometheus, Jaeger)"];
 
   // Processes
@@ -22,11 +23,11 @@ digraph level1 {
   p2 [label="2\nMaintain\nresources"];
   p3 [label="3\nCompute\navailability"];
   p4 [label="4\nBook\nappointment"];
-  p5 [label="5\nHandle advice\nrequest"];
+  p5 [label="5\nHandle advice\nrequest", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
   p6 [label="6\nManage\nlifecycle"];
   p7 [label="7\nObserve", fillcolor="#56636B"];
-  p8 [label="8\nDispatch\njobs"];
-  p9 [label="9\nManage\nparts"];
+  p8 [label="8\nDispatch\njobs", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
+  p9 [label="9\nManage\nparts", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
 
   // Data stores (open-ended boxes)
   node [shape=record, style=filled, fillcolor="#FFF7D6", fontcolor="#1F2A30", fixedsize=false, width=2.2, height=0.45, fontsize=11];
@@ -34,13 +35,13 @@ digraph level1 {
   d2 [label="{D2 | dealerships, bays,\ntechnicians, skills}"];
   d3 [label="{D3 | service packages}"];
   d4 [label="{D4 | vehicles}"];
-  d5 [label="{D5 | consultation requests}"];
+  d5 [label="{D5 | consultation requests}", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
   d6 [label="{D6 | appointments\n(EXCLUDE: bay, technician, vehicle)}"];
   d7 [label="{D7 | appointment events (audit)}"];
   d8 [label="{D8 | logs, metrics, traces}"];
-  d9 [label="{D9 | parts, part orders\n(stock CHECK \>= 0)}"];
+  d9 [label="{D9 | parts, part orders\n(stock CHECK \>= 0)}", fillcolor="#EEF0F0", color="#A7B0B4", fontcolor="#7D878C"];
 
-  { rank=same; customer; advisor; technician; admin; controller; partsStaff; }
+  { rank=same; customer; advisor; technician; admin; dealerAdmin; controller; partsStaff; }
   { rank=same; p1; p2; p5; }
   { rank=same; p3; p6; }
   { rank=same; d1; d2; d3; d4; }
@@ -52,7 +53,8 @@ digraph level1 {
   d1 -> p1 [label="user, role,\ndealership"];
 
   // 2 Resources
-  admin -> p2 [label="bays, technicians, staff,\nopening hours, dealership,\npackage catalogue"];
+  admin -> p2 [label="dealership, package catalogue"];
+  dealerAdmin -> p2 [label="bays, technicians, staff,\nopening hours", color="#B5BFBB", fontcolor="#7D878C"];
   p2 -> d3 [label="packages"];
   p2 -> d2 [label="resource rows"];
   p2 -> d1 [label="staff accounts"];
@@ -69,49 +71,54 @@ digraph level1 {
   d4 -> p4 [label="owned vehicle"];
   p3 -> p4 [label="free (bay, technician)\npairs, best fit"];
   p4 -> d6 [label="HELD appointment, then CONFIRMED;\nexpired holds released\n(row lock + EXCLUDE)"];
-  p4 -> d5 [label="mark BOOKED"];
+  p4 -> d5 [label="mark BOOKED", color="#B5BFBB", fontcolor="#7D878C"];
   p4 -> customer [label="hold with countdown,\nconfirmation, or\n409 + alternatives"];
   customer -> p4 [label="new vehicle details"];
   p4 -> d4 [label="vehicle"];
 
   // 5 Advice requests
-  customer -> p5 [label="areas, description"];
-  p5 -> d5 [label="request, decision"];
-  d5 -> p5 [label="queue"];
-  p5 -> advisor [label="waiting requests"];
-  advisor -> p5 [label="duration, skill,\nbay type, estimate"];
-  d5 -> p3 [label="approved job\nrequirement"];
+  customer -> p5 [label="areas, description", color="#B5BFBB", fontcolor="#7D878C"];
+  p5 -> d5 [label="request, decision", color="#B5BFBB", fontcolor="#7D878C"];
+  d5 -> p5 [label="queue", color="#B5BFBB", fontcolor="#7D878C"];
+  p5 -> advisor [label="waiting requests", color="#B5BFBB", fontcolor="#7D878C"];
+  advisor -> p5 [label="duration, skill,\nbay type, estimate", color="#B5BFBB", fontcolor="#7D878C"];
+  d5 -> p3 [label="approved job\nrequirement", color="#B5BFBB", fontcolor="#7D878C"];
 
   // 6 Lifecycle
-  advisor -> p6 [label="start, done,\nno-show, cancel"];
-  technician -> p6 [label="start, finish"];
+  advisor -> p6 [label="start, done,\nno-show, cancel", color="#B5BFBB", fontcolor="#7D878C"];
+  technician -> p6 [label="start, finish, close"];
   customer -> p6 [label="cancel"];
   d6 -> p6 [label="day board, jobs"];
   p6 -> d6 [label="new status"];
   p6 -> d7 [label="who, when, from, to"];
-  p6 -> d5 [label="re-open on cancel"];
-  p6 -> advisor [label="day board"];
+  p6 -> d5 [label="re-open on cancel", color="#B5BFBB", fontcolor="#7D878C"];
+  p6 -> advisor [label="day board", color="#B5BFBB", fontcolor="#7D878C"];
   p6 -> technician [label="my jobs"];
 
   // 8 Dispatch (workshop controller)
-  d6 -> p8 [label="busy periods"];
-  d2 -> p8 [label="bays, shifts, skills"];
-  p8 -> controller [label="workload per bay\nand technician"];
-  controller -> p8 [label="move job: bay,\ntechnician, reason"];
-  p8 -> d6 [label="new bay / technician\n(EXCLUDE)"];
-  p8 -> d7 [label="who moved it, why"];
+  d6 -> p8 [label="busy periods", color="#B5BFBB", fontcolor="#7D878C"];
+  d2 -> p8 [label="bays, shifts, skills", color="#B5BFBB", fontcolor="#7D878C"];
+  p8 -> controller [label="workload per bay\nand technician", color="#B5BFBB", fontcolor="#7D878C"];
+  controller -> p8 [label="move job: bay,\ntechnician, reason", color="#B5BFBB", fontcolor="#7D878C"];
+  p8 -> d6 [label="new bay / technician\n(EXCLUDE)", color="#B5BFBB", fontcolor="#7D878C"];
+  p8 -> d7 [label="who moved it, why", color="#B5BFBB", fontcolor="#7D878C"];
 
   // 9 Parts
-  advisor -> p9 [label="order parts for a job"];
-  technician -> p9 [label="order parts for a job"];
-  partsStaff -> p9 [label="stock, order → receive → issue"];
-  p9 -> d9 [label="stock levels, orders,\norder events"];
-  d9 -> p9 [label="shelf, open orders"];
-  d6 -> p9 [label="job belongs\nto dealership"];
-  p9 -> partsStaff [label="orders to fulfil"];
+  advisor -> p9 [label="order parts for a job", color="#B5BFBB", fontcolor="#7D878C"];
+  technician -> p9 [label="order parts for a job", color="#B5BFBB", fontcolor="#7D878C"];
+  partsStaff -> p9 [label="stock, order → receive → issue", color="#B5BFBB", fontcolor="#7D878C"];
+  p9 -> d9 [label="stock levels, orders,\norder events", color="#B5BFBB", fontcolor="#7D878C"];
+  d9 -> p9 [label="shelf, open orders", color="#B5BFBB", fontcolor="#7D878C"];
+  d6 -> p9 [label="job belongs\nto dealership", color="#B5BFBB", fontcolor="#7D878C"];
+  p9 -> partsStaff [label="orders to fulfil", color="#B5BFBB", fontcolor="#7D878C"];
 
   // 7 Observe (every process emits)
   { p1 p3 p4 p5 p6 p8 p9 } -> p7 [style=dotted, arrowhead=none, color="#9AA5AB"];
   p7 -> d8 [label="JSON logs, counters,\nlatency histograms, spans"];
   d8 -> monitor [label="/metrics scrape,\nOTLP traces"];
+
+  legend [shape=plaintext, style="", fixedsize=false, width=0, height=0, fontsize=11, fontcolor="#1F2A30", label=<<table border="1" cellborder="0" cellpadding="4" color="#B5BFBB">
+    <tr><td bgcolor="#1D4E89" width="14">  </td><td align="left">In this version: customer, technician, system manager</td></tr>
+    <tr><td bgcolor="#EEF0F0" border="1" width="14">  </td><td align="left"><font color="#7D878C">Grey: not in this version of the web app (the backend still has it)</font></td></tr>
+  </table>>];
 }
