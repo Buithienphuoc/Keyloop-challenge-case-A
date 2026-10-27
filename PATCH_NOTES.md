@@ -13,6 +13,11 @@ Entry format:
 
 ## Unreleased
 
+### My prompts (`docs/myprompts`)
+- **Docs:** `myprompts.md` at the repository root collects the prompts that shaped this project
+  most (scope, security, testing, domain model, team setup), translated to English, each with a
+  note on its impact.
+
 ### Diagrams: what is not in this version is grey, not gone (`docs/grey-not-in-version`)
 - **Docs:** use case, activity, state and data flow diagrams keep every role and flow; what is not
   in this version of the web app (service advisor, dealership admin, workshop controller, parts
