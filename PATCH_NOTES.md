@@ -13,7 +13,7 @@ Entry format:
 
 ## Unreleased
 
-### #NN Who sees what: every workshop for advisors, technicians and admins (`feat/role-permissions`)
+### #24 Who sees what: every workshop for advisors, technicians and admins (`feat/role-permissions`)
 - **Changed:** service advisors, technicians and dealership admins read every appointment and
   advice request of every workshop, and may move its status within the lifecycle rules (a
   technician starts and finishes jobs, also ones assigned to someone else; only an admin records
