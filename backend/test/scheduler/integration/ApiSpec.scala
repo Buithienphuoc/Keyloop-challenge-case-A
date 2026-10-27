@@ -120,6 +120,17 @@ class ApiSpec extends AnyFunSpec with Matchers with BeforeAndAfterAll:
       get(s"/api/staff/appointments?date=$Wed", advisorD1).ids should contain(appointmentId)
     }
 
+    it("lists the new booking under the board's upcoming bookings, soonest first, for its dealership only") {
+      val upcoming = get("/api/staff/appointments/upcoming", advisorD1)
+      upcoming.status shouldBe 200
+      upcoming.ids should contain(appointmentId)
+      val starts = upcoming.json.as[Seq[JsObject]].map(o => (o \ "start").as[String])
+      starts shouldBe starts.sorted
+      upcoming.json.as[Seq[JsObject]].map(o => (o \ "status").as[String]).distinct shouldBe Seq("CONFIRMED")
+      get("/api/staff/appointments/upcoming", advisorTD).ids should not contain appointmentId
+      get("/api/staff/appointments/upcoming", customer).status shouldBe 403
+    }
+
     it("never lets another dealership see the appointment") {
       get(s"/api/appointments/$appointmentId", advisorTD).status shouldBe 403
       val nosy = post("/api/auth/register", body = Json.obj("email" -> "nosy@demo.vn", "password" -> "Secret123", "fullName" -> "Nosy")).str("token")

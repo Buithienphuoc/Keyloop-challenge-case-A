@@ -83,6 +83,15 @@ class AppointmentServiceSpec extends AnyFunSpec with Matchers:
       f.store.lastFilter shouldBe Some(AppointmentFilter(customerId = Some("u1")))
     }
 
+    it("lists the dealership's upcoming bookings: confirmed, from now on, soonest first, at most 20") {
+      val f = Fixture(locked(CONFIRMED))
+      f.service.listUpcoming(auth(Role.SERVICE_ADVISOR))
+      f.store.lastFilter shouldBe Some(
+        AppointmentFilter(dealershipId = Some("d1"), from = Some(Now), statuses = Set(CONFIRMED), limit = AppointmentService.UpcomingLimit))
+      AppointmentService.UpcomingLimit shouldBe 20
+      statusOf(f.service.listUpcoming(auth(Role.SYSTEM_MANAGER, dealershipId = None))) shouldBe 403
+    }
+
     it("lists the admin's dealership jobs newest first, in one status or in all but HELD") {
       val f = Fixture(locked(CONFIRMED))
       f.service.listDealershipJobs(auth(Role.ADMIN), Some(AWAITING_PAYMENT))

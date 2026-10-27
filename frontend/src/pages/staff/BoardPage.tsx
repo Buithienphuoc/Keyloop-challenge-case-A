@@ -38,6 +38,13 @@ export function BoardPage() {
     queryFn: () => get<Appointment[]>(`/api/staff/appointments?date=${date}`),
     refetchInterval: 30_000,
   });
+  // The board shows one day, and customers can only book a little ahead, so a new booking
+  // usually lands on a later day. This list makes sure the advisor still sees it.
+  const upcoming = useQuery({
+    queryKey: ['staff', 'appointments', 'upcoming'],
+    queryFn: () => get<Appointment[]>('/api/staff/appointments/upcoming'),
+    refetchInterval: 30_000,
+  });
 
   if (!dealership || resources.isLoading) return <Loading />;
 
@@ -54,6 +61,11 @@ export function BoardPage() {
   const list = appointments.data ?? [];
   const active = list.filter((a) => a.status !== 'CANCELLED' && a.status !== 'EXPIRED');
   const selected = list.find((a) => a.id === selectedId) ?? null;
+  const later = (upcoming.data ?? []).filter((a) => dt(a.start).toISODate() !== date);
+  const openDay = (a: Appointment) => {
+    setDate(dt(a.start).toISODate()!);
+    setSelectedId(a.id);
+  };
   const nowLocal = DateTime.now().setZone(zone);
   const showNow = nowLocal.toISODate() === date && nowLocal.hour * 60 + nowLocal.minute > open && nowLocal.hour * 60 + nowLocal.minute < close;
   const nowPos = (((nowLocal.hour * 60 + nowLocal.minute) - open) / span) * 100;
@@ -125,7 +137,7 @@ export function BoardPage() {
             <JobPanel a={selected} date={date} resources={resources.data} onClose={() => setSelectedId(null)} />
           ) : (
             <div className="panel panel-tight stack">
-              <h3>Jobs today</h3>
+              <h3>{date === todayIn(zone) ? 'Jobs today' : 'Jobs this day'}</h3>
               {list.length === 0 && <Empty title="Nothing booked">This day has no appointments yet.</Empty>}
               {list.map((a) => (
                 <button key={a.id} className="choice" style={{ gridTemplateColumns: 'auto 1fr' }} onClick={() => setSelectedId(a.id)}>
@@ -138,6 +150,34 @@ export function BoardPage() {
                       {a.vehicle.plate} · {a.bay.name} · {a.technician.name}
                     </span>
                     <StatusPill status={a.status} />
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {!selected && (
+            <div className="panel panel-tight stack" role="region" aria-label="Coming up">
+              <h3>Coming up</h3>
+              {upcoming.isLoading && <Loading what="Looking ahead" />}
+              <ErrorNote error={upcoming.error} />
+              {upcoming.data && later.length === 0 && (
+                <p className="muted small">No other confirmed bookings{list.length > 0 ? ' after this day' : ''}.</p>
+              )}
+              {later.map((a) => (
+                <button key={a.id} className="choice" style={{ gridTemplateColumns: 'auto 1fr' }} onClick={() => openDay(a)}>
+                  <span className="sign" style={{ fontSize: '1rem', textAlign: 'center' }}>
+                    {dt(a.start).toFormat('ccc d LLL')}
+                    <br />
+                    {time(a.start)}
+                  </span>
+                  <span>
+                    <span className="title">{a.service.name}</span>
+                    <span className="sub" style={{ display: 'block' }}>
+                      {a.vehicle.plate} · {a.customer.fullName}
+                    </span>
+                    <span className="sub" style={{ display: 'block' }}>
+                      {a.reference} · booked {stamp(a.createdAt, a.dealership.timezone)}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -160,7 +200,10 @@ function JobPanel({ a, date, resources, onClose }: { a: Appointment; date: strin
       status === 'CANCELLED'
         ? post<Appointment>(`/api/appointments/${a.id}/cancel`, { reason: 'Cancelled by the dealership' })
         : post<Appointment>(`/api/appointments/${a.id}/status`, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff', 'appointments', date] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff', 'appointments', date] });
+      qc.invalidateQueries({ queryKey: ['staff', 'appointments', 'upcoming'] });
+    },
   });
   const started = Date.parse(a.start) <= Date.now();
 
